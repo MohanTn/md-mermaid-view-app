@@ -26,6 +26,8 @@
   },
   "dependencies": {
     "dompurify": "^3.2.6",
+    "hyparquet": "^1.29.1",
+    "hyparquet-compressors": "^1.1.1",
     "marked": "^15.0.7",
     "mermaid": "^11.6.0"
   },
@@ -36,6 +38,7 @@
     "@vitejs/plugin-react": "^4.4.1",
     "electron": "^36.2.1",
     "electron-builder": "^26.0.12",
+    "hyparquet-writer": "^0.16.6",
     "jsdom": "^26.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -53,21 +56,26 @@
       "dist/**/*",
       "package.json"
     ],
-    "asar": true,
-    "fileAssociations": [
+    "asar": true,    "fileAssociations": [
       { "ext": ["md", "markdown"], "name": "Markdown document", "role": "Editor" },
-      { "ext": ["mmd", "mermaid"], "name": "Mermaid diagram", "role": "Editor" }
+      { "ext": ["mmd", "mermaid"], "name": "Mermaid diagram", "role": "Editor" },
+      { "ext": ["parquet"], "name": "Parquet data", "role": "Viewer" }
     ],
     "mac": {
       "category": "public.app-category.developer-tools"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Development",
       "maintainer": "Orbit MD Viewer contributors <contributors@example.com>"
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     }
   }
 }

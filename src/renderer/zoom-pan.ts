@@ -5,7 +5,7 @@ export interface ViewTransform {
 }
 
 export const MIN_SCALE = 0.25;
-export const MAX_SCALE = 5;
+export const MAX_SCALE = 8;
 
 export function clampScale(scale: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));

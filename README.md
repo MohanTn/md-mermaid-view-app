@@ -1,6 +1,6 @@
 # Orbit MD Viewer
 
-Orbit is a minimal Electron desktop viewer for Markdown and Mermaid files. Open a Markdown or Mermaid file and it renders as HTML, with Mermaid diagrams drawn as SVG.
+Orbit is a minimal Electron desktop viewer for Markdown, Mermaid, and Parquet files. Open a Markdown or Mermaid file and it renders as HTML, with Mermaid diagrams drawn as SVG; Parquet files open in a paginated table viewer.
 
 ## Development
 
@@ -27,7 +27,10 @@ npm run build:deb
 
 - Markdown: `.md`, `.markdown`
 - Mermaid: `.mmd`, `.mermaid`
+- Parquet: `.parquet` (shown as a paginated table with column types, size, and row count)
 - Mermaid fenced blocks inside Markdown files are rendered in place.
+
+The Parquet viewer is powered by [hyparquet](https://github.com/hyparam/hyparquet), a pure-JavaScript Parquet reader; `hyparquet-compressors` adds gzip, brotli, zstd, and lz4 decompression alongside the built-in snappy support.
 
 ## Debian package
 
