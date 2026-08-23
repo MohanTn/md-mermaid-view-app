@@ -48,3 +48,5 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+.claude/repo-map.md

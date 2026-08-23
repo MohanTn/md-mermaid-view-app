@@ -4,7 +4,7 @@ const MAX_HISTORY = 12;
 export interface HistoryEntry {
   path: string;
   name: string;
-  kind: 'markdown' | 'mermaid';
+  kind: 'markdown' | 'mermaid' | 'parquet';
 }
 
 export function readHistory(storage: Storage = window.localStorage): HistoryEntry[] {
@@ -55,5 +55,5 @@ export function groupHistory(history: HistoryEntry[]): HistoryGroup[] {
 function isHistoryEntry(value: unknown): value is HistoryEntry {
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<HistoryEntry>;
-  return typeof item.path === 'string' && typeof item.name === 'string' && (item.kind === 'markdown' || item.kind === 'mermaid');
+  return typeof item.path === 'string' && typeof item.name === 'string' && (item.kind === 'markdown' || item.kind === 'mermaid' || item.kind === 'parquet');
 }

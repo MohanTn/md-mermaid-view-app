@@ -4,7 +4,7 @@ import { clampScale, panBy, resetTransform, wheelDeltaToPixels, zoomAt } from '.
 describe('zoom and pan', () => {
   it('clamps zoom to the allowed range', () => {
     expect(clampScale(0.05)).toBe(0.25);
-    expect(clampScale(20)).toBe(5);
+    expect(clampScale(20)).toBe(8);
     expect(clampScale(1.5)).toBe(1.5);
   });
 

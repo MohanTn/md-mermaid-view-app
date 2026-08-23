@@ -1,8 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu } from 'electron';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getDocumentKind, listSupportedFiles, readDocument } from './file-service.js';
+import { getDocumentKind, listSupportedFiles, openFile, queryParquet, readDocument, readParquet, readParquetPage, readSidecar, writeSidecar } from './file-service.js';
+import type { ParquetQuery } from '../shared/types.js';
 
 // Electron 36 can load GTK 4 alongside GTK 3 on Linux desktop environments.
 // Force the GTK 3 path used by the packaged Debian application.
@@ -70,12 +71,25 @@ ipcMain.handle('choose-file', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
-    filters: [{ name: 'Markdown & Mermaid', extensions: ['md', 'markdown', 'mmd', 'mermaid'] }],
+    filters: [
+      { name: 'Documents & Data', extensions: ['md', 'markdown', 'mmd', 'mermaid', 'parquet'] },
+      { name: 'Parquet data', extensions: ['parquet'] },
+      { name: 'Markdown', extensions: ['md', 'markdown'] },
+      { name: 'Mermaid', extensions: ['mmd', 'mermaid'] },
+    ],
   });
-  return result.canceled || !result.filePaths[0] ? null : readDocument(result.filePaths[0]);
+  const filePath = result.filePaths[0];
+  if (result.canceled || !filePath) return null;
+  return openFile(filePath);
 });
 ipcMain.handle('open-path', (_event, filePath: string) => readDocument(filePath));
 ipcMain.handle('list-directory', (_event, directoryPath?: string) => listSupportedFiles(directoryPath ?? app.getPath('documents')));
+ipcMain.handle('open-parquet', (_event, filePath: string) => readParquet(filePath));
+ipcMain.handle('open-parquet-page', (_event, filePath: string, rowStart: number, rowEnd: number) => readParquetPage(filePath, rowStart, rowEnd));
+ipcMain.handle('parquet-query', (_event, filePath: string, query: ParquetQuery) => queryParquet(filePath, query));
+ipcMain.handle('read-sidecar', (_event, filePath: string, tag: string) => readSidecar(filePath, tag));
+ipcMain.handle('write-sidecar', (_event, filePath: string, tag: string, content: string) => writeSidecar(filePath, tag, content));
+ipcMain.handle('copy-text', (_event, text: string) => { clipboard.writeText(text); });
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {

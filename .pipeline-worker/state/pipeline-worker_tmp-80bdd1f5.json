@@ -1,0 +1,45 @@
+{
+  "branch": "pipeline-worker/tmp-80bdd1f5",
+  "targetBranch": "main",
+  "worktreePath": "/tmp/pipeline-worker-ABG2jJ/worktree",
+  "ciFixAttempt": 0,
+  "conflictAttempt": 0,
+  "phase": "diff",
+  "changedFiles": [
+    "README.md",
+    "package-lock.json",
+    "package.json",
+    "src/main/file-service.ts",
+    "src/main/main.ts",
+    "src/preload/preload.cts",
+    "src/renderer/history.ts",
+    "src/renderer/main.tsx",
+    "src/renderer/styles.css",
+    "src/renderer/zoom-pan.ts",
+    "src/shared/types.ts",
+    "tests/file-service.test.ts",
+    "tests/zoom-pan.test.ts"
+  ],
+  "untrackedFiles": [
+    ".pipeline-worker/",
+    "src/renderer/diagram-comments.ts",
+    "src/renderer/parquet-table.tsx",
+    "src/renderer/pomodoro-logic.ts",
+    "src/renderer/pomodoro.tsx",
+    "src/shared/cell-text.ts",
+    "tests/diagram-comments.test.ts",
+    "tests/parquet-table.test.ts",
+    "tests/parquet.test.ts",
+    "tests/pomodoro.test.ts"
+  ],
+  "startedAt": "2026-08-23T20:44:05.920Z",
+  "updatedAt": "2026-08-23T20:44:05.920Z",
+  "history": [
+    {
+      "at": "2026-08-23T20:44:05.920Z",
+      "phase": "diff",
+      "level": "info",
+      "message": "Created worktree at /tmp/pipeline-worker-ABG2jJ/worktree (temp branch pipeline-worker/tmp-80bdd1f5)"
+    }
+  ]
+}
