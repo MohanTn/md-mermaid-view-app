@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Run tests
+        run: npm test
+      - name: Build Electron main process
+        run: npm run build:main
+      - name: Build renderer
+        run: npm run build:renderer
+
+  deb-install:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Debian package
+        run: npm run build:deb
+      - name: Verify packaged Electron startup
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          set +e
+          timeout 15s xvfb-run -a release/linux-unpacked/md-mermaid-viewer --no-sandbox --disable-gpu
+          status=$?
+          if test "$status" -ne 124; then
+            echo "Electron exited before the smoke-test timeout with status $status"
+            exit "$status"
+          fi
+
+      - name: Install Debian package
+        shell: bash
+        run: |
+          deb_path="$(find release -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$deb_path"
+          sudo apt-get update
+          sudo apt-get install -y "$deb_path"
+          package_name="$(dpkg-deb -f "$deb_path" Package)"
+          dpkg-query -W "$package_name"
+          echo "Installed $package_name successfully"
+      - name: Remove Debian package
+        if: always()
+        shell: bash
+        run: |
+          deb_path="$(find release -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          if test -n "$deb_path"; then
+            package_name="$(dpkg-deb -f "$deb_path" Package)"
+            if dpkg-query -W -f='${Status}' "$package_name" 2>/dev/null | grep -q 'install ok installed'; then
+              sudo apt-get remove -y "$package_name"
+            fi
+          fi
+
+  # Build Linux + Windows distributables on every push to main and publish them
+  # as a GitHub Release (released, not draft) so users can download the latest build.
+  release-main:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+            args: --linux
+          - os: windows-latest
+            name: windows
+            args: --win
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build packages
+        run: npm run build:release -- ${{ matrix.args }}
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: md-mermaid-viewer-${{ matrix.name }}
+          path: release/*
+          if-no-files-found: error
+
+  publish-main:
+    needs: release-main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-${{ github.sha }}
+          name: "Latest build from main (${{ github.sha }})"
+          body: |
+            Automatically built and published from the `main` branch.
+
+            ### Downloads
+            - **AppImage** — `*.AppImage` (portable Linux)
+            - **Debian package** — `*.deb` (Linux)
+            - **Windows installer** — `*.exe` (NSIS)
+
+            The checks (typecheck, tests, packaging smoke test) must pass before this release is published.
+          files: |
+            release/*.AppImage
+            release/*.deb
+            release/*.exe
+          make_latest: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

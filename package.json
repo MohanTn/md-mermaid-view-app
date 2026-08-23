@@ -1,0 +1,73 @@
+{
+  "name": "md-mermaid-viewer",
+  "version": "1.0.1",
+  "description": "A live Electron viewer for Markdown and Mermaid files.",
+  "main": "dist/main/main.js",
+  "homepage": "https://github.com",
+  "author": {
+    "name": "Orbit MD Viewer contributors",
+    "email": "contributors@example.com"
+  },
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/patch-mermaid.mjs",
+    "dev": "vite --config vite.config.ts",
+    "start": "electron .",
+    "build": "npm run typecheck && npm run build:main && npm run build:renderer && electron-builder --publish never",
+    "build:release": "npm run typecheck && npm run build:main && npm run build:renderer && electron-builder --publish never",
+    "build:deb": "npm run typecheck && npm run build:main && npm run build:renderer && electron-builder --linux deb --publish never",
+    "build:main": "tsc -p tsconfig.electron.json",
+    "build:renderer": "vite build --config vite.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preview": "vite preview --config vite.config.ts"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.6",
+    "marked": "^15.0.7",
+    "mermaid": "^11.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^4.4.1",
+    "electron": "^36.2.1",
+    "electron-builder": "^26.0.12",
+    "jsdom": "^26.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.3",
+    "vitest": "^3.1.2"
+  },
+  "build": {
+    "appId": "com.example.mdmermaidviewer",
+    "productName": "Orbit MD Viewer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "fileAssociations": [
+      { "ext": ["md", "markdown"], "name": "Markdown document", "role": "Editor" },
+      { "ext": ["mmd", "mermaid"], "name": "Mermaid diagram", "role": "Editor" }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development",
+      "maintainer": "Orbit MD Viewer contributors <contributors@example.com>"
+    },
+    "win": {
+      "target": ["nsis"]
+    }
+  }
+}
