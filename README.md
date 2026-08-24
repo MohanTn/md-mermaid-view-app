@@ -10,7 +10,7 @@ npm run build
 npm start
 ```
 
-`npm run dev` starts the Vite renderer for browser-focused work. Use `npm run build` followed by `npm start` to run the complete Electron shell locally.
+`npm run dev` starts the Vite renderer with a browser adapter for Markdown/Mermaid preview and local comment storage. Parquet and OS file-open integration remain Electron-only. Use `npm run build` followed by `npm start` to run the complete Electron shell locally.
 
 ## Checks
 

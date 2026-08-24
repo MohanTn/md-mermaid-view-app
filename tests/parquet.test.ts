@@ -88,6 +88,7 @@ describe('parquet viewer', () => {
     expect(page.rows).toHaveLength(50);
     expect(page.totalMatching).toBe(250);
     expect(page.page).toBe(3);
+    expect(page.scannedRows).toBe(250);
     expect(page.truncated).toBe(false);
     expect(page.rows[0]).toMatchObject({ name: 'Person 200' });
   });
@@ -99,6 +100,7 @@ describe('parquet viewer', () => {
     // matching rows are exactly Person 7, 17, 27, 37, 47.
     const page = await queryParquet(filePath, { page: 1, filter: 'PERSON 7' });
     expect(page.totalMatching).toBe(5);
+    expect(page.scannedRows).toBe(50);
     expect(page.rows.map((row) => row.name)).toEqual(['Person 7', 'Person 17', 'Person 27', 'Person 37', 'Person 47']);
     const none = await queryParquet(filePath, { page: 1, filter: 'zzz-not-present' });
     expect(none.totalMatching).toBe(0);

@@ -30,6 +30,7 @@ export function ParquetTable({ document, onError }: ParquetTableProps): React.JS
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [totalMatching, setTotalMatching] = useState(document.totalRows);
+  const [scannedRows, setScannedRows] = useState(document.totalRows);
   const [truncated, setTruncated] = useState(false);
   const { pageSize, totalRows, columns } = document;
   const totalPages = Math.max(1, Math.ceil(totalMatching / pageSize));
@@ -51,6 +52,7 @@ export function ParquetTable({ document, onError }: ParquetTableProps): React.JS
     if (useInitialRows) {
       setRows(document.rows);
       setTotalMatching(document.totalRows);
+      setScannedRows(document.totalRows);
       setTruncated(false);
       return () => { cancelled = true; };
     }
@@ -61,6 +63,7 @@ export function ParquetTable({ document, onError }: ParquetTableProps): React.JS
         if (!cancelled) {
           setRows(result.rows);
           setTotalMatching(result.totalMatching);
+          setScannedRows(result.scannedRows);
           setTruncated(result.truncated);
         }
       })
@@ -95,11 +98,13 @@ export function ParquetTable({ document, onError }: ParquetTableProps): React.JS
     <div className="parquet-view">
       <div className="parquet-summary">
         {filterActive
-          ? <span>{totalMatching.toLocaleString()} of {totalRows.toLocaleString()} rows</span>
+          ? truncated
+            ? <span>{totalMatching.toLocaleString()} matches in first {scannedRows.toLocaleString()} of {totalRows.toLocaleString()} rows</span>
+            : <span>{totalMatching.toLocaleString()} of {totalRows.toLocaleString()} rows</span>
           : <span>{totalRows.toLocaleString()} rows</span>}
         <span>{columns.length} column{columns.length === 1 ? '' : 's'}</span>
         <span>{formatBytes(document.fileSize)}</span>
-        {truncated && <span className="parquet-truncated" title="Files over 200,000 rows are scanned from the start only">first 200,000 rows scanned</span>}
+        {truncated && <span className="parquet-truncated" title="Filtering and sorting inspect only the first 200,000 rows">sampled query</span>}
       </div>
       <div className="parquet-toolbar">
         <input
@@ -148,7 +153,9 @@ export function ParquetTable({ document, onError }: ParquetTableProps): React.JS
             {rows.length === 0 && !loading && (
               <tr>
                 <td className="parquet-empty" colSpan={columns.length + 1}>
-                  {filterActive ? 'No rows match the filter.' : 'No rows to show.'}
+                  {filterActive
+                    ? truncated ? 'No rows match in the scanned sample.' : 'No rows match the filter.'
+                    : 'No rows to show.'}
                 </td>
               </tr>
             )}
@@ -159,7 +166,9 @@ export function ParquetTable({ document, onError }: ParquetTableProps): React.JS
       <div className="parquet-pagination">
         <button onClick={() => goTo(1)} disabled={page <= 1 || loading} title="First page">« First</button>
         <button onClick={() => goTo(page - 1)} disabled={page <= 1 || loading} title="Previous page">‹ Prev</button>
-        <span className="parquet-page-info">Page {page} of {totalPages}</span>
+        <span className="parquet-page-info" title={truncated ? 'Pagination covers the scanned sample, not the entire file.' : undefined}>
+          Page {page} of {totalPages}{truncated ? ' (sample)' : ''}
+        </span>
         <button onClick={() => goTo(page + 1)} disabled={page >= totalPages || loading} title="Next page">Next ›</button>
         <button onClick={() => goTo(totalPages)} disabled={page >= totalPages || loading} title="Last page">Last »</button>
       </div>

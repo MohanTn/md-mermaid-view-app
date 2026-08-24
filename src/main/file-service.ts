@@ -167,7 +167,9 @@ export async function readParquet(filePath: string): Promise<ParquetDocument> {
 }
 
 export async function readParquetPage(filePath: string, rowStart: number, rowEnd: number): Promise<ParquetPage> {
-  return { rows: await readParquetRows(path.resolve(filePath), rowStart, rowEnd) };
+  const start = Number.isSafeInteger(rowStart) ? Math.max(0, rowStart) : 0;
+  const end = Number.isSafeInteger(rowEnd) ? Math.max(0, rowEnd) : start;
+  return { rows: await readParquetRows(path.resolve(filePath), start, end) };
 }
 
 /**
@@ -179,10 +181,10 @@ export async function readParquetPage(filePath: string, rowStart: number, rowEnd
  */
 export async function queryParquet(filePath: string, query: ParquetQuery): Promise<ParquetQueryResult> {
   const absolutePath = path.resolve(filePath);
-  const page = Math.max(1, query.page);
-  const filter = query.filter?.trim() ?? '';
-  const sortColumn = query.sortColumn ?? null;
-  const sortDirection = query.sortDirection ?? 'asc';
+  const page = Number.isSafeInteger(query.page) ? Math.max(1, query.page) : 1;
+  const filter = typeof query.filter === 'string' ? query.filter.trim() : '';
+  const sortColumn = typeof query.sortColumn === 'string' && query.sortColumn.length > 0 ? query.sortColumn : null;
+  const sortDirection = query.sortDirection === 'desc' ? 'desc' : 'asc';
   const pageSize = PARQUET_PAGE_SIZE;
 
   if (!filter && !sortColumn) {
@@ -191,7 +193,7 @@ export async function queryParquet(filePath: string, query: ParquetQuery): Promi
     const rows = await readParquetRows(absolutePath, rowStart, rowStart + pageSize);
     const file = await asyncBufferFromFile(absolutePath);
     const metadata = await parquetMetadataAsync(file);
-    return { rows, totalMatching: Number(metadata.num_rows), page, pageSize, truncated: false };
+    return { rows, totalMatching: Number(metadata.num_rows), page, pageSize, scannedRows: Number(metadata.num_rows), truncated: false };
   }
 
   const { rows, truncated } = await materializedRows(absolutePath);
@@ -208,6 +210,7 @@ export async function queryParquet(filePath: string, query: ParquetQuery): Promi
     totalMatching: filtered.length,
     page,
     pageSize,
+    scannedRows: rows.length,
     truncated,
   };
 }

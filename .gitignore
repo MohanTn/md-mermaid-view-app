@@ -50,3 +50,4 @@ Thumbs.db
 !.vscode/settings.json
 
 .claude/repo-map.md
+.pipeline-worker/**

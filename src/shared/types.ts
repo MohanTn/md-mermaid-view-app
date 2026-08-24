@@ -54,6 +54,8 @@ export interface ParquetQueryResult {
   totalMatching: number;
   page: number;
   pageSize: number;
+  /** Number of rows inspected for this result. */
+  scannedRows: number;
   /** True when only the first portion of a large file was scanned. */
   truncated: boolean;
 }

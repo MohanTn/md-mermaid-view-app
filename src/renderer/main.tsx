@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import mermaid from 'mermaid';
 import type { MermaidConfig } from 'mermaid';
+import { installBrowserViewer } from './browser-viewer';
 import type { FileDocument, FileEntry, ParquetDocument } from '../shared/types';
 import { addToHistory, directoryName, groupHistory, readHistory, type HistoryEntry } from './history';
 import { ParquetTable } from './parquet-table';
@@ -48,8 +48,9 @@ function mermaidConfig(theme: Theme): MermaidConfig {
   };
 }
 
-// Dark mode is the default; keep the chosen theme across restarts.
-mermaid.initialize(mermaidConfig('dark'));
+// Vite has no Electron preload bridge; install a browser-safe adapter before
+// React effects access window.viewer. Electron keeps its real preload API.
+installBrowserViewer();
 
 function App(): React.JSX.Element {
   const [document, setDocument] = useState<FileDocument | ParquetDocument | null>(null);
@@ -99,8 +100,8 @@ function App(): React.JSX.Element {
       setDocument(loaded);
       setTransform(resetTransform());
       setEditor(null);
-      // Comments are diagram-only; close the panel for data files.
-      if (loaded.kind === 'parquet') setCommentsOpen(false);
+      // Comments are Mermaid-diagram-only; close the panel for other files.
+      if (loaded.kind !== 'mermaid') setCommentsOpen(false);
       setHistory(addToHistory({ path: loaded.path, name: loaded.name, kind: loaded.kind }));
       const fileDirectory = loaded.path.replace(/[\\/][^\\/]+$/, '');
       setDirectory(fileDirectory);
@@ -120,7 +121,7 @@ function App(): React.JSX.Element {
   // Load comments from the companion file `<name>_<tag>.txt` for the current document.
   useEffect(() => {
     let cancelled = false;
-    if (!document || document.kind === 'parquet') {
+    if (!document || document.kind !== 'mermaid') {
       setComments([]);
       return () => { cancelled = true; };
     }
@@ -245,26 +246,35 @@ function App(): React.JSX.Element {
       ? (document.kind === 'mermaid' ? renderMermaid(document.content) : renderMarkdown(document.content))
       : '',
   }), [document, theme]);
+  const isMarkdown = document?.kind === 'markdown';
 
   useEffect(() => {
+    let cancelled = false;
     const renderDiagrams = async () => {
       if (!previewRef.current || document?.kind === 'parquet') return;
+      // Mermaid is loaded only when a text document actually contains a
+      // diagram. This keeps the empty viewer and Markdown-only startup light.
+      await window.document.fonts.ready;
+      const { default: mermaid } = await import('mermaid');
+      if (cancelled || !previewRef.current) return;
       // Mermaid sizes nodes from measured text; if fonts are still loading the
       // boxes come out too small and neighboring nodes end up overlapping.
-      await window.document.fonts.ready;
       mermaid.initialize(mermaidConfig(theme));
       const nodes = Array.from(previewRef.current.querySelectorAll<HTMLElement>('.mermaid'));
       await Promise.all(nodes.map(async (node) => {
+        if (cancelled) return;
         try {
           const source = normalizeMermaidSource(decodeURIComponent(node.dataset.diagram ?? ''));
           node.classList.add('mermaid-rendering');
           node.textContent = source;
           await mermaid.run({ nodes: [node] });
+          if (cancelled) return;
           node.classList.remove('mermaid-rendering');
           if (!node.querySelector('svg')) throw new Error('Mermaid returned no SVG output.');
           attachNodeClickHandlers(node, source);
           applyCommentHighlights(node, source, commentsRef.current);
         } catch (renderError) {
+          if (cancelled) return;
           node.className = 'mermaid mermaid-error';
           const wrapped = renderError as { str?: string; message?: string } | undefined;
           const message = renderError instanceof Error ? renderError.message : wrapped?.str ?? wrapped?.message ?? 'Unable to render diagram.';
@@ -272,7 +282,10 @@ function App(): React.JSX.Element {
         }
       }));
     };
-    void renderDiagrams();
+    void renderDiagrams().catch((renderError: unknown) => {
+      if (!cancelled) setError(renderError instanceof Error ? renderError.message : String(renderError));
+    });
+    return () => { cancelled = true; };
   }, [document, theme]);
 
   function applyCommentHighlights(container: HTMLElement, source: string, commentList: DiagramComment[]): void {
@@ -305,8 +318,9 @@ function App(): React.JSX.Element {
     const viewport = viewportRef.current;
     if (!viewport) return;
     const onWheel = (event: WheelEvent) => {
-      // The Parquet table scrolls natively; leave its wheel events alone.
-      if (documentRef.current?.kind === 'parquet') return;
+      // Markdown and the Parquet table scroll natively; only the Mermaid
+      // canvas needs custom pan/zoom wheel handling.
+      if (documentRef.current?.kind !== 'mermaid') return;
       event.preventDefault();
       const rect = viewport.getBoundingClientRect();
       const px = event.clientX - rect.left;
@@ -456,6 +470,7 @@ function App(): React.JSX.Element {
           <button className={`panel-toggle ${collapsed ? 'is-collapsed' : ''}`} onClick={() => setCollapsed((current) => !current)} title={collapsed ? 'Show file list (Ctrl+B)' : 'Hide file list (Ctrl+B)'} aria-label={collapsed ? 'Show file list' : 'Hide file list'} aria-expanded={!collapsed}>
             {collapsed ? '▶' : '◀'}
           </button>
+          <button className="open-button" onClick={() => void chooseFile()} title="Open file (Ctrl+O)">Open…</button>
           <span className="toolbar-file" title={document?.path}>{document ? document.name : 'No file open'}</span>
           <PomodoroTimer />
           <button
@@ -466,7 +481,7 @@ function App(): React.JSX.Element {
           >
             {theme === 'dark' ? '☾' : '☀'}
           </button>
-          {document && document.kind !== 'parquet' && (
+          {document?.kind === 'mermaid' && (
             <div className="zoom-controls" role="group" aria-label="Zoom controls">
               <button className="zoom-button" onClick={() => zoomAtCenter(1.25)} title="Zoom in (Ctrl++)">＋</button>
               <span className="zoom-level">{Math.round(transform.scale * 100)}%</span>
@@ -474,14 +489,13 @@ function App(): React.JSX.Element {
               <button className="zoom-button" onClick={() => setTransform(resetTransform())} title="Reset zoom (Ctrl+0)">1:1</button>
             </div>
           )}
-          {document && document.kind !== 'parquet' && (
+          {document?.kind === 'mermaid' && (
           <button className={`comments-button ${commentsOpen ? 'active' : ''}`} onClick={() => setCommentsOpen((current) => !current)} title="Add comments to the diagram (sidecar file)">
             Comments{comments.length > 0 ? ` (${comments.length})` : ''}
           </button>
           )}
-          <button className="open-button" onClick={() => void chooseFile()} title="Open file (Ctrl+O)">Open…</button>
         </header>
-        {commentsOpen && document && (
+        {commentsOpen && document?.kind === 'mermaid' && (
           <aside className="comments-panel">
             <div className="comments-panel-header">
               <span>Comments</span>
@@ -514,9 +528,16 @@ function App(): React.JSX.Element {
         {document?.kind === 'parquet'
           ? <ParquetTable key={document.path} document={document} onError={setError} />
           : (
-          <div ref={viewportRef} className={`canvas-viewport ${isPanning ? 'is-panning' : ''}`} onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={endPan}>
+          <div
+            ref={viewportRef}
+            className={`${isMarkdown ? 'markdown-viewport' : 'canvas-viewport'} ${isPanning ? 'is-panning' : ''}`}
+            onPointerDown={isMarkdown ? undefined : beginPan}
+            onPointerMove={isMarkdown ? undefined : movePan}
+            onPointerUp={isMarkdown ? undefined : endPan}
+            onPointerCancel={isMarkdown ? undefined : endPan}
+          >
             {document
-              ? <article ref={previewRef} className="document" style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }} dangerouslySetInnerHTML={renderedHtml} />
+              ? <article ref={previewRef} className={`document ${isMarkdown ? 'markdown-preview' : 'diagram-preview'}`} style={isMarkdown ? undefined : { transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }} dangerouslySetInnerHTML={renderedHtml} />
               : <div className="empty">Open a Markdown, Mermaid, or Parquet file (File ▸ Open… or Ctrl+O).</div>}
             {editor && (
               <div className="comment-editor" style={{ left: editor.x, top: editor.y }}>
