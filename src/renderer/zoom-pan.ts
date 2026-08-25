@@ -20,7 +20,12 @@ export function resetTransform(): ViewTransform {
  * cursor. The document is translated by (x, y) and scaled from its top-left
  * corner, so a content point `p` lands at screen `p * scale + (x, y)`.
  */
-export function zoomAt(transform: ViewTransform, px: number, py: number, factor: number): ViewTransform {
+export function zoomAt(
+  transform: ViewTransform,
+  px: number,
+  py: number,
+  factor: number,
+): ViewTransform {
   const scale = clampScale(transform.scale * factor);
   const applied = scale / transform.scale;
   return {
@@ -30,12 +35,20 @@ export function zoomAt(transform: ViewTransform, px: number, py: number, factor:
   };
 }
 
-export function panBy(transform: ViewTransform, dx: number, dy: number): ViewTransform {
+export function panBy(
+  transform: ViewTransform,
+  dx: number,
+  dy: number,
+): ViewTransform {
   return { ...transform, x: transform.x + dx, y: transform.y + dy };
 }
 
 /** Converts a wheel delta to pixels, honoring the event's delta mode. */
-export function wheelDeltaToPixels(delta: number, deltaMode: number, viewportSize: number): number {
+export function wheelDeltaToPixels(
+  delta: number,
+  deltaMode: number,
+  viewportSize: number,
+): number {
   if (deltaMode === 1) return delta * 16; // lines
   if (deltaMode === 2) return delta * viewportSize; // pages
   return delta; // pixels

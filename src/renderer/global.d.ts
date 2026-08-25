@@ -1,4 +1,4 @@
-import type { ViewerApi } from '../shared/types';
+import type { ViewerApi } from "../shared/types";
 
 declare global {
   interface Window {

@@ -1,0 +1,96 @@
+flowchart TD
+  subgraph P1["1. Orientation — Orbit MD Viewer moves a selected file through Electron, IPC, and React"]
+    O1["Electron main process (src/main/main.ts) — starts one BrowserWindow — in: process.argv + OS app event -> out: isolated window"]
+    O2["Preload bridge (src/preload/preload.cts) — exposes only ViewerApi — in: ipcRenderer.invoke calls -> out: window.viewer methods"]
+    O3["React renderer (src/renderer/main.tsx) — chooses document view and UI state — in: FileDocument or ParquetDocument -> out: HTML/SVG canvas or table"]
+    O4["File service (src/main/file-service.ts) — reads text or Parquet from disk — in: absolute path -> out: typed document payload"]
+    O5["Persistent browser state — localStorage history/theme/panel width plus sidecar comments — in: user changes -> out: settings and companion text file"]
+    O1 -->|"1. creates BrowserWindow with preload, contextIsolation=true, nodeIntegration=false"| O2
+    O2 -->|"2. window.viewer: chooseFile/openPath/listDirectory/readSidecar/writeSidecar/openParquet/queryParquet"| O3
+    O3 -->|"3. IPC request with path and typed arguments"| O4
+    O4 -->|"4. Promise<FileDocument | ParquetDocument>"| O3
+    O3 -->|"5. localStorage keys and <source>_<tag>.txt writes"| O5
+  end
+
+  subgraph P2["2. Startup and file opening — the scenario 'open docs/guide.md' threads through the app"]
+    S1["Electron startup (src/main/main.ts) — requests a single-instance lock — in: process.argv ['electron','docs/guide.md'] -> out: one running app or app.quit()"]
+    S2["Path filter getFilePathFromArgv — skips flags, resolves path, checks supported extension and existsSync — in: docs/guide.md -> out: absolute /repo/docs/guide.md"]
+    S3["Window readiness queue — queues paths until did-finish-load — in: absolute path before renderer ready -> out: open-path-event"]
+    S4["Renderer loadFile — routes .parquet to openParquet and other files to openPath — in: /repo/docs/guide.md -> out: markdown IPC request"]
+    S5["File service readDocument — validates .md/.markdown/.mmd/.mermaid, reads UTF-8 and stat metadata — in: file path -> out: {path,name,kind:'markdown',content,updatedAt}"]
+    S6["Renderer state update — resets zoom/editor, records history, lists containing directory — in: FileDocument -> out: document + files + directory state"]
+    S1 -->|"1. app.requestSingleInstanceLock(): boolean"| S2
+    S2 -->|"2. supported absolute path or null"| S3
+    S3 -->|"3. webContents.send('open-path-event', filePath)"| S4
+    S4 -->|"4. window.viewer.openPath(filePath)"| S5
+    S5 -->|"5. return FileDocument with content '# Guide' (illustrative)"| S6
+    S6 -->|"6. addToHistory({path,name,kind}), listDirectory(directory)"| H1
+    S1 -->|"1a. lock is false -> app.quit(), no window"| F1
+  end
+
+  subgraph P3["3. Markdown and Mermaid rendering — the scenario 'guide.md contains a Mermaid fence'"]
+    R1["Renderer markdown.ts renderMarkdown — replaces ```mermaid fences with encoded div placeholders — in: ```mermaid flowchart TD A-->B ``` -> out: <div class='mermaid' data-diagram='...'>"]
+    R2["DOMPurify + marked — converts safe Markdown to HTML and removes unsafe tags — in: '# Guide <script>...' -> out: '<h1>Guide</h1>' without script"]
+    R3["Mermaid effect in main.tsx — waits for document.fonts.ready, initializes Mermaid strict dark/light config — in: .mermaid elements + theme -> out: render jobs"]
+    R4["mermaid.run — draws each source into SVG — in: 'flowchart TD A-->B' -> out: SVG node and edge DOM"]
+    R5["Comment binding — extractSubgraphs/findNodeLine/nodeIdFromDomId attach click handlers and highlights — in: SVG + source lines -> out: editor for node id and line"]
+    R1 -->|"1. encoded diagram source in HTML attribute"| R2
+    R2 -->|"2. sanitized article HTML containing Mermaid placeholders"| R3
+    R3 -->|"3. normalizeMermaidSource(decodeURIComponent(data-diagram))"| R4
+    R4 -->|"4. SVG output or caught render error text"| R5
+    R4 -->|"4a. invalid Mermaid -> node class mermaid-error + readable message"| F2
+  end
+
+  subgraph P4["4. Parquet data path — lazy pages first, cached query path for filter/sort"]
+    Q1["File service openFile/readParquet — detects .parquet and reads metadata/schema — in: data.parquet -> out: columns, totalRows, fileSize, first 100 rows"]
+    Q2["ParquetTable component — shows summary/table and controls — in: ParquetDocument -> out: page 1 UI, filter input, sortable headers"]
+    Q3["Lazy queryParquet branch — no filter and no sort reads requested row range only — in: {page:3} -> out: rows 200..299, totalMatching=num_rows, truncated=false"]
+    Q4["Materialized query branch — reads up to PARQUET_QUERY_ROW_CAP=200000 rows and caches by path+mtime — in: {filter:'PERSON 7',sortColumn:'age'} -> out: filtered/sorted page, totalMatching, truncated"]
+    Q5["Row helpers — matchesFilter requires every term across cellText values; compareCells is type-aware with nulls last — in: row {name:'Person 7',age:27} -> out: true for 'PERSON 7'; numeric ordering"]
+    Q1 -->|"1. hyparquet metadata + parquetSchema; readParquetRows(0,min(100,totalRows))"| Q2
+    Q2 -->|"2. debounce filter 250ms; query {page,filter,sortColumn,sortDirection}"| Q3
+    Q2 -->|"2a. same typed query, with filter or sort"| Q4
+    Q3 -->|"3. readParquetRows(rowStart,rowStart+100) -> Record<string,unknown>[]"| Q2
+    Q4 -->|"3a. materialized rows -> matchesFilter -> compareCells -> slice(page*100)"| Q5
+    Q5 -->|"4. ParquetQueryResult {rows,totalMatching,page,pageSize:100,truncated}"| Q2
+    Q4 -->|"3b. file over 200000 rows -> first 200000 scanned notice; no full-file query"| F3
+  end
+
+  subgraph P5["5. User interactions — diagram navigation, comments, history, theme, and focus timer"]
+    U1["Toolbar/file list — click Open or a listed/recent file — in: path -> out: loadFile(path) and selected document"]
+    U2["Zoom/pan helpers (zoom-pan.ts) — clamp scale 0.25..8 and keep cursor point fixed — in: scale 1, point (100,50), factor 2 -> out: scale 2,x -100,y -50"]
+    U3["Diagram comments — click SVG node, edit text, serialize sidecar — in: '[P4] (line 42): review' -> out: `<name>_review.txt` and highlighted node"]
+    U4["History (history.ts) — de-duplicates and keeps newest 12 localStorage entries, groups by directory — in: repeated /repo/a.md -> out: one newest entry"]
+    U5["PomodoroTimer + pomodoro-logic — one-second tick while running, 25/5/15 minute defaults, long break every 4 work sessions — in: work 00:01 -> out: paused short/long break and Web Audio chime"]
+    U1 -->|"1. button click or open-path event -> loadFile"| S4
+    U2 -->|"2. wheel/pinch/button -> ViewTransform {scale,x,y}"| R3
+    U3 -->|"3. parseSidecar/serializeSidecar through read/writeSidecar IPC"| O4
+    U4 -->|"4. JSON localStorage key md-mermaid-viewer-history"| O5
+    U5 -->|"5. setInterval(...,1000), tick(state,durations)"| O3
+  end
+
+  subgraph P6["6. Build and test path — source becomes packaged Electron output"]
+    B1["npm run typecheck — TypeScript checks tsconfig.json without emit — in: src/**/*.ts,tsx -> out: diagnostics or success"]
+    B2["npm run build:main — tsc -p tsconfig.electron.json emits dist/main, dist/preload, dist/shared — in: Electron source -> out: JavaScript + source maps"]
+    B3["npm run build:renderer — Vite uses vite.config.ts root src/renderer and output dist/renderer — in: index.html/main.tsx -> out: bundled renderer"]
+    B4["electron-builder --publish never — packages dist and package.json using appId com.example.mdmermaidviewer — in: dist + build config -> out: release installers"]
+    B5["npm test — Vitest jsdom/node suites cover file service, Parquet, rendering, comments, history, timer, zoom — in: fixtures + pure helpers -> out: pass/fail report"]
+    B1 -->|"1. tsc --noEmit"| B2
+    B2 -->|"2. emitted main/preload JavaScript"| B3
+    B3 -->|"3. dist/renderer assets"| B4
+    B1 -->|"1a. same TypeScript source checked before tests/build"| B5
+    B5 -->|"4. test results; failures identify affected flow"| F4
+  end
+
+  subgraph P7["7. Failure modes — named by symptom, with root cause and fix"]
+    F1["app closes immediately — cause: another instance owns requestSingleInstanceLock; fix: close existing Orbit process or send file to its window; in: second launch -> out: second-instance event instead of a second window"]
+    F2["diagram shows an error message — cause: Mermaid source is invalid or normalization failed; fix: inspect the exact source in data-diagram and correct flowchart syntax; in: invalid source -> out: valid SVG"]
+    F3["filtered Parquet result says first 200000 rows scanned — cause: query cap protects memory on larger files; fix: use unfiltered lazy paging or query within the scanned prefix; in: >200000-row file -> out: explicit truncated=true"]
+    F4["build or test fails — cause: TypeScript, Vite, Electron, or fixture regression; fix: run npm run typecheck, npm test, then build:main/build:renderer to isolate stage; in: failing command -> out: stage-specific diagnostic"]
+    F5["comment is not visible after reload — cause: sidecar tag/path differs or line does not match current source; fix: verify `<document>_<sanitized-tag>.txt` beside the source and update node line; in: sidecar line -> out: parsed highlight"]
+  end
+
+  S6 -->|"document state feeds renderer and history"| R1
+  S6 -->|"kind='parquet' selects data table instead of article"| Q1
+  B4 -->|"packaged app starts the same P2 lifecycle"| O1
+  R5 -->|"node click creates sidecar-backed review state"| U3
