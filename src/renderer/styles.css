@@ -1450,3 +1450,105 @@ button {
   font-size: 11px;
   text-align: center;
 }
+
+/* Mermaid Live-style diagram workspace. Mermaid itself generates the SVG;
+   this layer only provides the neutral stage and navigation affordances. */
+.mermaid-mode .viewer {
+  background: #f8f9fa;
+}
+:root.dark .mermaid-mode .viewer {
+  background: #1f2227;
+}
+.mermaid-mode .canvas-viewport {
+  background-color: #f8f9fa;
+  cursor: grab;
+}
+:root.dark .mermaid-mode .canvas-viewport {
+  background-color: #1f2227;
+}
+.mermaid-mode .canvas-viewport.is-panning {
+  cursor: grabbing;
+}
+.mermaid-mode .diagram-preview {
+  top: 50%;
+  left: 50%;
+  width: 0;
+  max-width: none;
+  min-width: 0;
+  padding: 0;
+  line-height: 1;
+  transform-origin: center center;
+}
+.mermaid-mode .diagram-preview .diagram-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  transform: translate(-50%, -50%);
+}
+.mermaid-mode .diagram-preview .diagram-transform {
+  width: max-content;
+  transform-origin: center center;
+}
+.mermaid-mode .diagram-preview .mermaid {
+  margin: 0;
+  width: max-content;
+  text-align: left;
+}
+.mermaid-mode .diagram-preview .mermaid svg {
+  display: block;
+  width: auto;
+  max-width: none;
+  height: auto;
+  margin: 0;
+}
+.mermaid-canvas-controls {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: color-mix(in srgb, var(--raised-bg) 92%, transparent);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow-soft);
+  user-select: none;
+}
+.mermaid-canvas-controls button {
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mermaid-canvas-controls button:hover {
+  background: var(--raised-hover);
+}
+.mermaid-canvas-controls span {
+  min-width: 52px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.mermaid-mode .mermaid-error {
+  max-width: min(720px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 16px;
+  background: var(--error-bg);
+}
+
+@media (max-width: 560px) {
+  .mermaid-canvas-controls {
+    right: 10px;
+    bottom: 10px;
+  }
+}

@@ -1,0 +1,10 @@
+node_modules
+release
+dist
+dist-web
+workspace
+.git
+.github
+.pipeline-worker
+.ai-memory
+*.log

@@ -1,12 +1,6 @@
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import type { MermaidConfig } from "mermaid";
 import type { FileDocument, ParquetDocument, CodeGraphDocument } from "../../shared/types";
-import {
-  extractSubgraphs,
-  findNodeLine,
-  nodeIdFromDomId,
-  type DiagramComment,
-} from "../diagram-comments";
 import { normalizeMermaidSource } from "../markdown";
 import type { Theme } from "./use-theme";
 
@@ -15,13 +9,6 @@ function mermaidConfig(theme: Theme): MermaidConfig {
     startOnLoad: false,
     securityLevel: "strict",
     theme: theme === "dark" ? "dark" : "default",
-    flowchart: {
-      padding: 8,
-      nodeSpacing: 160,
-      rankSpacing: 150,
-      useMaxWidth: true,
-      htmlLabels: true,
-    },
   };
 }
 
@@ -29,25 +16,31 @@ interface UseMermaidRenderParams {
   document: FileDocument | ParquetDocument | CodeGraphDocument | null;
   theme: Theme;
   previewRef: React.RefObject<HTMLElement | null>;
-  /** Live ref to current comments (used inside the highlight re-apply effect). */
-  commentsRef: React.MutableRefObject<DiagramComment[]>;
-  /** Shared with pan/zoom — suppressing node clicks after a drag. */
-  panMovedRef: React.MutableRefObject<boolean>;
-  /** Callback to open the inline comment editor for a clicked node. */
-  openCommentEditor: (id: string, line: number, element: SVGGElement) => void;
+  /** Called once the canvas diagram has an SVG sized in pixels. */
+  onRendered?: () => void;
   setError: (msg: string) => void;
 }
 
-/** Renders Mermaid diagrams into `.mermaid` placeholders and wires node
- *  click → comment editor.  Re-applies highlight CSS classes when comments
- *  change (so no full re-render is needed). */
+/**
+ * Pins the rendered SVG to its viewBox size in pixels. Mermaid emits
+ * `width="100%"` plus an inline `max-width`, which resolves to zero inside the
+ * canvas's `max-content` wrappers, so the diagram would render but be invisible.
+ */
+function sizeSvgToViewBox(node: HTMLElement): void {
+  const svg = node.querySelector("svg");
+  const box = svg?.viewBox.baseVal;
+  if (!svg || !box || box.width <= 0 || box.height <= 0) return;
+  svg.style.width = `${box.width}px`;
+  svg.style.height = `${box.height}px`;
+  svg.style.maxWidth = "none";
+}
+
+/** Renders Mermaid diagrams into `.mermaid` placeholders for the canvas. */
 export function useMermaidRender({
   document,
   theme,
   previewRef,
-  commentsRef,
-  panMovedRef,
-  openCommentEditor,
+  onRendered,
   setError,
 }: UseMermaidRenderParams): void {
   // ──────────────────────────────────────────────────────────────
@@ -81,8 +74,12 @@ export function useMermaidRender({
             node.classList.remove("mermaid-rendering");
             if (!node.querySelector("svg"))
               throw new Error("Mermaid returned no SVG output.");
-            attachNodeClickHandlers(node, source);
-            applyCommentHighlights(node, source, commentsRef.current);
+            // Only the standalone canvas needs a pixel-sized SVG; inside a
+            // Markdown article the diagram should shrink to the column.
+            if (document?.kind === "mermaid") {
+              sizeSvgToViewBox(node);
+              onRendered?.();
+            }
           } catch (renderError) {
             if (cancelled) return;
             node.className = "mermaid mermaid-error";
@@ -115,77 +112,4 @@ export function useMermaidRender({
     };
   }, [document, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ──────────────────────────────────────────────────────────────
-  // Re-apply highlights when comments change (no full re-render)
-  // ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const container = previewRef.current;
-    if (!container) return;
-    container.querySelectorAll<HTMLElement>(".mermaid").forEach((el) => {
-      applyCommentHighlights(
-        el,
-        normalizeMermaidSource(decodeURIComponent(el.dataset.diagram ?? "")),
-        commentsRef.current,
-      );
-    });
-  }, [commentsRef.current, document]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ──────────────────────────────────────────────────────────────
-  // Pure helpers (not stateful, defined outside JSX scope)
-  // ──────────────────────────────────────────────────────────────
-  function attachNodeClickHandlers(
-    container: HTMLElement,
-    source: string,
-  ): void {
-    const subgraphs = extractSubgraphs(source);
-    const subgraphByTitle = new Map(subgraphs.map((s) => [s.title, s]));
-    container
-      .querySelectorAll<SVGGElement>("g.node, g.cluster")
-      .forEach((g) => {
-        g.addEventListener("click", (event) => {
-          event.stopPropagation();
-          if (panMovedRef.current) return;
-          let id: string | null = null;
-          if (g.classList.contains("cluster")) {
-            const label = (
-              g.querySelector(".cluster-label, foreignObject, text")
-                ?.textContent ?? ""
-            ).trim();
-            id = subgraphByTitle.get(label)?.id ?? null;
-          } else {
-            id = nodeIdFromDomId(g.id);
-          }
-          if (!id) return;
-          const line = findNodeLine(source, id);
-          if (line !== null) openCommentEditor(id, line, g);
-        });
-      });
-  }
-
-  function applyCommentHighlights(
-    container: HTMLElement,
-    source: string,
-    cs: DiagramComment[],
-  ): void {
-    const subgraphs = extractSubgraphs(source);
-    const subgraphByTitle = new Map(subgraphs.map((s) => [s.title, s.id]));
-    container
-      .querySelectorAll<SVGGElement>("g.node, g.cluster")
-      .forEach((g) => {
-        let id: string | null = null;
-        if (g.classList.contains("cluster")) {
-          const label = (
-            g.querySelector(".cluster-label, foreignObject, text")
-              ?.textContent ?? ""
-          ).trim();
-          id = subgraphByTitle.get(label) ?? null;
-        } else {
-          id = nodeIdFromDomId(g.id);
-        }
-        g.classList.toggle(
-          "has-comment",
-          id !== null && cs.some((c) => c.id === id),
-        );
-      });
-  }
 }

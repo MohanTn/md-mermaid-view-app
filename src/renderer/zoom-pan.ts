@@ -4,7 +4,7 @@ export interface ViewTransform {
   y: number;
 }
 
-export const MIN_SCALE = 0.25;
+export const MIN_SCALE = 0.05;
 export const MAX_SCALE = 8;
 
 export function clampScale(scale: number): number {
@@ -13,6 +13,27 @@ export function clampScale(scale: number): number {
 
 export function resetTransform(): ViewTransform {
   return { scale: 1, x: 0, y: 0 };
+}
+
+/**
+ * Zooms around an arbitrary CSS transform origin while keeping the viewport
+ * point (px, py) fixed under the cursor.
+ */
+export function zoomAtOrigin(
+  transform: ViewTransform,
+  px: number,
+  py: number,
+  factor: number,
+  originX: number,
+  originY: number,
+): ViewTransform {
+  const scale = clampScale(transform.scale * factor);
+  const applied = scale / transform.scale;
+  return {
+    scale,
+    x: px - originX - (px - originX - transform.x) * applied,
+    y: py - originY - (py - originY - transform.y) * applied,
+  };
 }
 
 /**
@@ -26,13 +47,7 @@ export function zoomAt(
   py: number,
   factor: number,
 ): ViewTransform {
-  const scale = clampScale(transform.scale * factor);
-  const applied = scale / transform.scale;
-  return {
-    scale,
-    x: px - (px - transform.x) * applied,
-    y: py - (py - transform.y) * applied,
-  };
+  return zoomAtOrigin(transform, px, py, factor, 0, 0);
 }
 
 export function panBy(
@@ -52,4 +67,23 @@ export function wheelDeltaToPixels(
   if (deltaMode === 1) return delta * 16; // lines
   if (deltaMode === 2) return delta * viewportSize; // pages
   return delta; // pixels
+}
+
+/**
+ * Scale that fits content of the given size inside the viewport, leaving
+ * `padding` pixels of margin. Never enlarges past 100%.
+ */
+export function fitScale(
+  contentWidth: number,
+  contentHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  padding = 24,
+): number {
+  if (contentWidth <= 0 || contentHeight <= 0) return 1;
+  const availableWidth = Math.max(viewportWidth - padding * 2, 1);
+  const availableHeight = Math.max(viewportHeight - padding * 2, 1);
+  return clampScale(
+    Math.min(1, availableWidth / contentWidth, availableHeight / contentHeight),
+  );
 }

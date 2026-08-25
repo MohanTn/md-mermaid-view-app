@@ -1,8 +1,49 @@
 # Orbit MD Viewer
 
-Orbit is a minimal Electron desktop viewer for Markdown, Mermaid, and Parquet files. Open a Markdown or Mermaid file and it renders as HTML, with Mermaid diagrams drawn as SVG; Parquet files open in a paginated table viewer.
+Orbit is a Markdown, Mermaid, Parquet, and code-graph viewer. It can run as an Electron desktop app or as a browser-hosted web app backed by a small Node server.
 
-## Development
+## Hosted Web App
+
+The web deployment reads files from a server-side workspace directory. The directory is intentionally scoped so the browser cannot request arbitrary paths from the host.
+
+### Docker Compose
+
+1. Put Markdown, Mermaid, Parquet, or source-code files in `./workspace`.
+2. Start the service:
+
+```bash
+docker compose up --build -d
+```
+
+3. Open <http://localhost:5222>.
+
+The Compose file mounts `./workspace` into `/workspace` in the container. Sidecar comments and saved code-graph layouts are written into that mounted directory. Stop it with:
+
+```bash
+docker compose down
+```
+
+To use another host directory, change the left side of the volume mapping in `docker-compose.yml` while keeping `/workspace` as the container path.
+
+### Run Without Docker
+
+```bash
+npm install
+npm run build:web
+WORKSPACE_ROOT=/absolute/path/to/workspace npm run start:web
+```
+
+The web server listens on `http://localhost:5222` by default. Set `PORT` to change the port.
+
+The hosted web app supports:
+
+- Browsing files in the configured workspace root
+- Markdown and Mermaid rendering, including Mermaid comments persisted as sidecar files
+- Parquet pagination, filtering, and sorting
+- Code graph scanning through the server's language-server processes
+- Saving code graph layouts into `.orbit-code-graph-layout.json`
+
+## Electron Development
 
 ```bash
 npm install
@@ -10,7 +51,7 @@ npm run build
 npm start
 ```
 
-`npm run dev` starts the Vite renderer with a browser adapter for Markdown/Mermaid preview and local comment storage. Parquet and OS file-open integration remain Electron-only. Use `npm run build` followed by `npm start` to run the complete Electron shell locally.
+`npm run dev` starts the Vite renderer with a browser adapter for local Markdown/Mermaid preview and local comment storage. The hosted deployment is the supported browser mode for Parquet and code-graph features.
 
 ## Checks
 
@@ -19,11 +60,12 @@ npm run typecheck
 npm test
 npm run build:main
 npm run build:renderer
+npm run build:web
 npm run build
 npm run build:deb
 ```
 
-## Supported files
+## Supported Files
 
 - Markdown: `.md`, `.markdown`
 - Mermaid: `.mmd`, `.mermaid`
@@ -32,7 +74,7 @@ npm run build:deb
 
 The Parquet viewer is powered by [hyparquet](https://github.com/hyparam/hyparquet), a pure-JavaScript Parquet reader; `hyparquet-compressors` adds gzip, brotli, zstd, and lz4 decompression alongside the built-in snappy support.
 
-## Debian package
+## Debian Package
 
 Generate only the Linux Debian package locally:
 

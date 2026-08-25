@@ -3,7 +3,6 @@ import type { FileDocument, ParquetDocument, CodeGraphDocument } from "../../sha
 import { ParquetTable } from "../parquet-table";
 import { CodeGraphPage, ScanningOverlay } from "./code-graph-page";
 import type { ViewTransform } from "../zoom-pan";
-import type { EditorState } from "../hooks/use-comments";
 
 interface ContentAreaProps {
   isScanning: boolean;
@@ -14,17 +13,15 @@ interface ContentAreaProps {
   isMermaid: boolean;
   transform: ViewTransform;
   isPanning: boolean;
-  editor: EditorState | null;
   onError: (message: string) => void;
-  onSaveEditor: () => void;
-  onCancelEditor: () => void;
   onBeginPan?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onMovePan?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onEndPan?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
   viewportRef: React.RefObject<HTMLDivElement | null>;
   previewRef: React.RefObject<HTMLElement | null>;
-  /** Ref for the inline comment textarea — owned by useComments, passed through. */
-  editorTextRef: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 export function ContentArea({
@@ -36,16 +33,15 @@ export function ContentArea({
   isMermaid,
   transform,
   isPanning,
-  editor,
   onError,
-  onSaveEditor,
-  onCancelEditor,
   onBeginPan,
   onMovePan,
   onEndPan,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
   viewportRef,
   previewRef,
-  editorTextRef,
 }: ContentAreaProps): React.JSX.Element {
   if (document?.kind === "parquet") {
     return (
@@ -92,64 +88,35 @@ export function ContentArea({
       <article
         ref={previewRef}
         className={`document ${isMarkdown ? "markdown-preview" : "diagram-preview"}`}
-        style={
-          isMermaid
-            ? {
+      >
+        {isMermaid ? (
+          <div className="diagram-content">
+            <div
+              className="diagram-transform"
+              style={{
                 transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-              }
-            : undefined
-        }
-        dangerouslySetInnerHTML={renderedHtml}
-      />
-      {editor && (
-        <CommentEditor
-          editor={editor}
-          editorTextRef={editorTextRef}
-          onSave={onSaveEditor}
-          onCancel={onCancelEditor}
-        />
+              }}
+              dangerouslySetInnerHTML={renderedHtml}
+            />
+          </div>
+        ) : (
+          <div dangerouslySetInnerHTML={renderedHtml} />
+        )}
+      </article>
+      {isMermaid && (
+        <div className="mermaid-canvas-controls" role="group" aria-label="Diagram controls">
+          <button onClick={onZoomOut} title="Zoom out (Ctrl+-)" aria-label="Zoom out">
+            −
+          </button>
+          <span aria-live="polite">{Math.round(transform.scale * 100)}%</span>
+          <button onClick={onZoomIn} title="Zoom in (Ctrl++)" aria-label="Zoom in">
+            +
+          </button>
+          <button onClick={onZoomReset} title="Reset view (Ctrl+0)" aria-label="Reset diagram view">
+            ⌂
+          </button>
+        </div>
       )}
-    </div>
-  );
-}
-
-function CommentEditor({
-  editor,
-  editorTextRef,
-  onSave,
-  onCancel,
-}: {
-  editor: EditorState;
-  editorTextRef: React.RefObject<HTMLTextAreaElement | null>;
-  onSave: () => void;
-  onCancel: () => void;
-}): React.JSX.Element {
-  return (
-    <div
-      className="comment-editor"
-      style={{ left: editor.x, top: editor.y }}
-    >
-      <div className="comment-editor-title">
-        {editor.id} · line {editor.line}
-      </div>
-      <textarea
-        ref={editorTextRef}
-        defaultValue={editor.initial}
-        rows={2}
-        autoFocus
-        placeholder={`Comment on ${editor.id}…`}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            onSave();
-          }
-          if (event.key === "Escape") onCancel();
-        }}
-      />
-      <div className="comment-editor-actions">
-        <button onClick={onSave}>Save</button>
-        <button onClick={onCancel}>Cancel</button>
-      </div>
     </div>
   );
 }
