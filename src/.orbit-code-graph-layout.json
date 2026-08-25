@@ -1,0 +1,129 @@
+{
+  "positions": {
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/components/code-graph-page.tsx": {
+      "x": 2586.278933423311,
+      "y": 268.5765086548343
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/components/code-graph-view.tsx": {
+      "x": -233.68112745098028,
+      "y": 1285.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/main/code-graph.ts": {
+      "x": -1524.2318627450977,
+      "y": 975.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/components/comments-panel.tsx": {
+      "x": 2585.68112745098,
+      "y": 461.2245833333333
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/main/lsp-manager.ts": {
+      "x": -198.18112745098028,
+      "y": 1595.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/main/file-service.ts": {
+      "x": -861.2064950980391,
+      "y": 975.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/main/main.ts": {
+      "x": 2603.18112745098,
+      "y": 759.2245833333334
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/browser-viewer.ts": {
+      "x": -198.18112745098028,
+      "y": 975.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/components/content-area.tsx": {
+      "x": -223.18112745098028,
+      "y": 1953.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/components/file-list.tsx": {
+      "x": 2558.68112745098,
+      "y": 1075.2245833333334
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/components/reference-panel.tsx": {
+      "x": -231.68112745098028,
+      "y": 2215.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/components/toolbar.tsx": {
+      "x": 2559.68112745098,
+      "y": 1361.2245833333334
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/diagram-comments.ts": {
+      "x": -209.68112745098028,
+      "y": 2447.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/global.d.ts": {
+      "x": 2550.18112745098,
+      "y": 1581.2245833333334
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/graph-layout.ts": {
+      "x": -198.18112745098028,
+      "y": 2667.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/history.ts": {
+      "x": 1181.5,
+      "y": 1100.7754166666664
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/hooks/use-comments.ts": {
+      "x": 158.81887254901972,
+      "y": 652.9999999999999
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/hooks/use-file-loader.ts": {
+      "x": 670.1594362745099,
+      "y": 652.9999999999999
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/hooks/use-keyboard-shortcuts.ts": {
+      "x": 2584.68112745098,
+      "y": 1735.2245833333336
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/hooks/use-mermaid-render.ts": {
+      "x": -223.68112745098028,
+      "y": 2851.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/hooks/use-pan-zoom.ts": {
+      "x": 1181.5,
+      "y": 652.9999999999999
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/hooks/use-panel.ts": {
+      "x": 1692.84056372549,
+      "y": 652.9999999999999
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/hooks/use-theme.ts": {
+      "x": 2204.18112745098,
+      "y": 652.9999999999999
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/main.tsx": {
+      "x": 1181.5,
+      "y": 205.22458333333333
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/markdown.ts": {
+      "x": 2550.18112745098,
+      "y": 1895.2245833333336
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/pomodoro-logic.ts": {
+      "x": -198.18112745098028,
+      "y": 3143.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/parquet-table.tsx": {
+      "x": -861.2064950980391,
+      "y": 241.22458333333333
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/pomodoro.tsx": {
+      "x": 2550.18112745098,
+      "y": 2043.2245833333336
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/renderer/zoom-pan.ts": {
+      "x": -198.18112745098028,
+      "y": 3441.6245833333332
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/shared/cell-text.ts": {
+      "x": 2550.18112745098,
+      "y": 2179.2245833333336
+    },
+    "/home/mohan/REPO/md-mermaid-view-app/src/shared/types.ts": {
+      "x": -861.2064950980391,
+      "y": 608.4245833333333
+    }
+  },
+  "savedAt": "2026-08-24T20:36:09.095Z"
+}

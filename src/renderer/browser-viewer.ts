@@ -1,24 +1,36 @@
-import type { FileDocument, FileEntry, ParquetDocument, ParquetPage, ParquetQueryResult, ViewerApi } from '../shared/types';
+import type {
+  FileDocument,
+  FileEntry,
+  ParquetDocument,
+  ParquetPage,
+  ParquetQueryResult,
+  ViewerApi,
+  CodeGraphDocument,
+  NodeDetail,
+} from "../shared/types";
 
 interface BrowserFile {
   path: string;
   document: FileDocument;
 }
 
-function documentKind(name: string): FileDocument['kind'] | null {
+function documentKind(name: string): FileDocument["kind"] | null {
   const extension = name.toLowerCase().match(/\.[^.]+$/)?.[0];
-  if (extension === '.md' || extension === '.markdown') return 'markdown';
-  if (extension === '.mmd' || extension === '.mermaid') return 'mermaid';
+  if (extension === ".md" || extension === ".markdown") return "markdown";
+  if (extension === ".mmd" || extension === ".mermaid") return "mermaid";
   return null;
 }
 
 function sidecarKey(filePath: string, tag: string): string {
-  const safeTag = tag.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'notes';
+  const safeTag =
+    tag.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "notes";
   return `md-mermaid-viewer-browser-sidecar:${filePath}:${safeTag}`;
 }
 
 function unsupportedParquet(): never {
-  throw new Error('Parquet files are available in the Electron app; browser preview supports Markdown and Mermaid files.');
+  throw new Error(
+    "Parquet files are available in the Electron app; browser preview supports Markdown and Mermaid files.",
+  );
 }
 
 /**
@@ -32,7 +44,10 @@ export function createBrowserViewerApi(): ViewerApi {
 
   const openBrowserFile = async (file: File): Promise<FileDocument> => {
     const kind = documentKind(file.name);
-    if (!kind) throw new Error('Choose a Markdown (.md, .markdown) or Mermaid (.mmd, .mermaid) file.');
+    if (!kind)
+      throw new Error(
+        "Choose a Markdown (.md, .markdown) or Mermaid (.mmd, .mermaid) file.",
+      );
     const path = `browser://${nextId++}-${encodeURIComponent(file.name)}`;
     const document: FileDocument = {
       path,
@@ -47,9 +62,9 @@ export function createBrowserViewerApi(): ViewerApi {
 
   return {
     async chooseFile(): Promise<FileDocument | null> {
-      const input = window.document.createElement('input');
-      input.type = 'file';
-      input.accept = '.md,.markdown,.mmd,.mermaid';
+      const input = window.document.createElement("input");
+      input.type = "file";
+      input.accept = ".md,.markdown,.mmd,.mermaid";
       input.multiple = true;
       return new Promise((resolve, reject) => {
         let settled = false;
@@ -75,7 +90,10 @@ export function createBrowserViewerApi(): ViewerApi {
 
     async openPath(filePath: string): Promise<FileDocument> {
       const file = files.get(filePath);
-      if (!file) throw new Error('That browser-preview file is no longer available. Choose it again.');
+      if (!file)
+        throw new Error(
+          "That browser-preview file is no longer available. Choose it again.",
+        );
       return file.document;
     },
 
@@ -92,10 +110,14 @@ export function createBrowserViewerApi(): ViewerApi {
     },
 
     async readSidecar(filePath: string, tag: string): Promise<string> {
-      return window.localStorage.getItem(sidecarKey(filePath, tag)) ?? '';
+      return window.localStorage.getItem(sidecarKey(filePath, tag)) ?? "";
     },
 
-    async writeSidecar(filePath: string, tag: string, content: string): Promise<string> {
+    async writeSidecar(
+      filePath: string,
+      tag: string,
+      content: string,
+    ): Promise<string> {
       window.localStorage.setItem(sidecarKey(filePath, tag), content);
       return `${filePath}_${tag}.txt`;
     },
@@ -105,13 +127,13 @@ export function createBrowserViewerApi(): ViewerApi {
         await navigator.clipboard.writeText(text);
         return;
       }
-      const textarea = window.document.createElement('textarea');
+      const textarea = window.document.createElement("textarea");
       textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
       window.document.body.appendChild(textarea);
       textarea.select();
-      window.document.execCommand('copy');
+      window.document.execCommand("copy");
       textarea.remove();
     },
 
@@ -123,6 +145,26 @@ export function createBrowserViewerApi(): ViewerApi {
     },
     async queryParquet(): Promise<ParquetQueryResult> {
       return unsupportedParquet();
+    },
+
+    // ── Code graph (browser unsupported) ──
+    async openWorkspace(): Promise<CodeGraphDocument | null> {
+      throw new Error("Code graph is available in the Electron app only.");
+    },
+    async scanWorkspace(): Promise<CodeGraphDocument> {
+      throw new Error("Code graph is available in the Electron app only.");
+    },
+    async cancelScan(): Promise<void> {
+      // No-op: the browser dev preview never starts a scan to cancel.
+    },
+    async getNodeDetail(): Promise<NodeDetail> {
+      throw new Error("Code graph is available in the Electron app only.");
+    },
+    async saveGraphLayout(): Promise<void> {
+      throw new Error("Code graph is available in the Electron app only.");
+    },
+    onScanProgress(): () => void {
+      return () => undefined;
     },
   };
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_DURATIONS,
   LONG_BREAK_EVERY,
@@ -14,15 +14,18 @@ import {
   setMode,
   start,
   tick,
-} from './pomodoro-logic';
+} from "./pomodoro-logic";
 
-const MODES: PomodoroMode[] = ['work', 'short', 'long'];
+const MODES: PomodoroMode[] = ["work", "short", "long"];
 
 // Pleasant two-tone chime generated with the Web Audio API (no audio asset).
 let audioContext: AudioContext | null = null;
 function playChime(): void {
   try {
-    const AudioContextCtor = window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioContextCtor =
+      window.AudioContext ??
+      (window as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
     if (!AudioContextCtor) return;
     audioContext ??= new AudioContextCtor();
     void audioContext.resume();
@@ -32,7 +35,7 @@ function playChime(): void {
       const start = now + index * 0.28;
       const oscillator = audioContext!.createOscillator();
       const gain = audioContext!.createGain();
-      oscillator.type = 'sine';
+      oscillator.type = "sine";
       oscillator.frequency.value = frequency;
       gain.gain.setValueAtTime(0, start);
       gain.gain.linearRampToValueAtTime(0.5, start + 0.02);
@@ -49,7 +52,8 @@ function playChime(): void {
 
 export function PomodoroTimer(): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const [durations, setDurations] = useState<PomodoroDurations>(DEFAULT_DURATIONS);
+  const [durations, setDurations] =
+    useState<PomodoroDurations>(DEFAULT_DURATIONS);
   const [state, setState] = useState<PomodoroState>(() => initialState());
   const rootRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef(false);
@@ -79,21 +83,22 @@ export function PomodoroTimer(): React.JSX.Element {
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(event.target as Node))
+        setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === "Escape") setOpen(false);
     };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
 
   const cycle = cycleProgress(state);
-  const runningClass = state.running ? 'running' : '';
+  const runningClass = state.running ? "running" : "";
 
   return (
     <div className="pomodoro" ref={rootRef}>
@@ -105,7 +110,9 @@ export function PomodoroTimer(): React.JSX.Element {
       >
         <span className="pomodoro-dot" aria-hidden="true" />
         <span className="pomodoro-time">{formatTime(state.secondsLeft)}</span>
-        <span className="pomodoro-caret" aria-hidden="true">{open ? '▲' : '▼'}</span>
+        <span className="pomodoro-caret" aria-hidden="true">
+          {open ? "▲" : "▼"}
+        </span>
       </button>
 
       {open && (
@@ -114,7 +121,7 @@ export function PomodoroTimer(): React.JSX.Element {
             {MODES.map((mode) => (
               <button
                 key={mode}
-                className={`pomodoro-mode ${state.mode === mode ? 'active' : ''}`}
+                className={`pomodoro-mode ${state.mode === mode ? "active" : ""}`}
                 onClick={() => setState(setMode(state, mode, durations))}
               >
                 {MODE_LABELS[mode]}
@@ -124,35 +131,79 @@ export function PomodoroTimer(): React.JSX.Element {
 
           <div className="pomodoro-status">
             <span>{MODE_LABELS[state.mode]}</span>
-            <span className="pomodoro-big">{formatTime(state.secondsLeft)}</span>
-            <span className="pomodoro-cycle" title={`${cycle}/${LONG_BREAK_EVERY} work sessions in this cycle`}>
+            <span className="pomodoro-big">
+              {formatTime(state.secondsLeft)}
+            </span>
+            <span
+              className="pomodoro-cycle"
+              title={`${cycle}/${LONG_BREAK_EVERY} work sessions in this cycle`}
+            >
               {Array.from({ length: LONG_BREAK_EVERY }, (_, index) => (
-                <span key={index} className={`pomodoro-cycle-dot ${index < cycle ? 'filled' : ''}`} aria-hidden="true" />
+                <span
+                  key={index}
+                  className={`pomodoro-cycle-dot ${index < cycle ? "filled" : ""}`}
+                  aria-hidden="true"
+                />
               ))}
-              <span className="pomodoro-cycle-label">{cycle}/{LONG_BREAK_EVERY}</span>
+              <span className="pomodoro-cycle-label">
+                {cycle}/{LONG_BREAK_EVERY}
+              </span>
             </span>
           </div>
 
           <div className="pomodoro-actions">
-            {state.running
-              ? <button className="pomodoro-action" onClick={() => setState(pause(state))}>Pause</button>
-              : <button className="pomodoro-action primary" onClick={() => setState(start(state))}>Start</button>}
-            <button className="pomodoro-action" onClick={() => setState(reset(state, durations))}>Reset</button>
+            {state.running ? (
+              <button
+                className="pomodoro-action"
+                onClick={() => setState(pause(state))}
+              >
+                Pause
+              </button>
+            ) : (
+              <button
+                className="pomodoro-action primary"
+                onClick={() => setState(start(state))}
+              >
+                Start
+              </button>
+            )}
+            <button
+              className="pomodoro-action"
+              onClick={() => setState(reset(state, durations))}
+            >
+              Reset
+            </button>
           </div>
 
           <div className="pomodoro-durations">
             {MODES.map((mode) => (
               <label key={mode} className="pomodoro-duration">
-                <span>{MODE_LABELS[mode].split(' ')[0]}</span>
+                <span>{MODE_LABELS[mode].split(" ")[0]}</span>
                 <button
-                  onClick={() => setDurations((current) => ({ ...current, [mode]: Math.max(1, current[mode] - 1) }))}
+                  onClick={() =>
+                    setDurations((current) => ({
+                      ...current,
+                      [mode]: Math.max(1, current[mode] - 1),
+                    }))
+                  }
                   title={`Decrease ${MODE_LABELS[mode]} duration`}
-                >−</button>
-                <span className="pomodoro-duration-value">{durations[mode]}m</span>
+                >
+                  −
+                </button>
+                <span className="pomodoro-duration-value">
+                  {durations[mode]}m
+                </span>
                 <button
-                  onClick={() => setDurations((current) => ({ ...current, [mode]: current[mode] + 1 }))}
+                  onClick={() =>
+                    setDurations((current) => ({
+                      ...current,
+                      [mode]: current[mode] + 1,
+                    }))
+                  }
                   title={`Increase ${MODE_LABELS[mode]} duration`}
-                >＋</button>
+                >
+                  ＋
+                </button>
               </label>
             ))}
           </div>
