@@ -1,8 +1,14 @@
 import React, { type PointerEvent as ReactPointerEvent } from "react";
+import Editor from "@monaco-editor/react";
 import type { FileDocument, ParquetDocument, CodeGraphDocument } from "../../shared/types";
 import { ParquetTable } from "../parquet-table";
 import { CodeGraphPage, ScanningOverlay } from "./code-graph-page";
 import type { ViewTransform } from "../zoom-pan";
+import type { Theme } from "../hooks/use-theme";
+import type { EditorViewMode } from "../hooks/use-document-editor";
+
+const MIN_EDITOR_HEIGHT = 100;
+const MAX_EDITOR_HEIGHT = 600;
 
 interface ContentAreaProps {
   isScanning: boolean;
@@ -13,6 +19,13 @@ interface ContentAreaProps {
   isMermaid: boolean;
   transform: ViewTransform;
   isPanning: boolean;
+  theme: Theme;
+  editorSource: string;
+  onEditorSourceChange: (source: string) => void;
+  viewMode: EditorViewMode;
+  onViewModeChange: (mode: EditorViewMode) => void;
+  editorHeight: number;
+  onEditorHeightChange: (height: number) => void;
   onError: (message: string) => void;
   onBeginPan?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onMovePan?: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -33,6 +46,13 @@ export function ContentArea({
   isMermaid,
   transform,
   isPanning,
+  theme,
+  editorSource,
+  onEditorSourceChange,
+  viewMode,
+  onViewModeChange,
+  editorHeight,
+  onEditorHeightChange,
   onError,
   onBeginPan,
   onMovePan,
@@ -67,16 +87,12 @@ export function ContentArea({
     );
   }
 
-  if (!document) {
-    return (
-      <div className="empty">
-        Open a Markdown, Mermaid, or Parquet file (File ▸ Open… or
-        Ctrl+O).
-      </div>
-    );
-  }
+  // No file open yet and nothing typed: still a live scratchpad (the parent
+  // keeps isMarkdown/isMermaid meaningful even with document === null), just
+  // with a hint where the preview will appear instead of rendered content.
+  const isEmptySource = !editorSource.trim();
 
-  return (
+  const canvasPane = (
     <div
       ref={viewportRef}
       className={`${isMarkdown ? "markdown-viewport" : "canvas-viewport"} ${isPanning ? "is-panning" : ""}`}
@@ -85,25 +101,32 @@ export function ContentArea({
       onPointerUp={isMermaid ? onEndPan : undefined}
       onPointerCancel={isMermaid ? onEndPan : undefined}
     >
-      <article
-        ref={previewRef}
-        className={`document ${isMarkdown ? "markdown-preview" : "diagram-preview"}`}
-      >
-        {isMermaid ? (
-          <div className="diagram-content">
-            <div
-              className="diagram-transform"
-              style={{
-                transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-              }}
-              dangerouslySetInnerHTML={renderedHtml}
-            />
-          </div>
-        ) : (
-          <div dangerouslySetInnerHTML={renderedHtml} />
-        )}
-      </article>
-      {isMermaid && (
+      {isEmptySource ? (
+        <div className="empty">
+          Type {isMermaid ? "Mermaid" : "Markdown"} in the editor below to
+          preview it here.
+        </div>
+      ) : (
+        <article
+          ref={previewRef}
+          className={`document ${isMarkdown ? "markdown-preview" : "diagram-preview"}`}
+        >
+          {isMermaid ? (
+            <div className="diagram-content">
+              <div
+                className="diagram-transform"
+                style={{
+                  transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+                }}
+                dangerouslySetInnerHTML={renderedHtml}
+              />
+            </div>
+          ) : (
+            <div dangerouslySetInnerHTML={renderedHtml} />
+          )}
+        </article>
+      )}
+      {isMermaid && !isEmptySource && (
         <div className="mermaid-canvas-controls" role="group" aria-label="Diagram controls">
           <button onClick={onZoomOut} title="Zoom out (Ctrl+-)" aria-label="Zoom out">
             −
@@ -118,5 +141,105 @@ export function ContentArea({
         </div>
       )}
     </div>
+  );
+
+  // Mermaid.live-style workspace: preview on top, a live source editor
+  // docked across the lower half by default, resizable via the handle
+  // between, with a toggle to preview the buffer as Markdown or Mermaid.
+  return (
+    <div className="doc-workspace">
+      <div className="doc-workspace-canvas">{canvasPane}</div>
+      <EditorResizeHandle
+        editorHeight={editorHeight}
+        onEditorHeightChange={onEditorHeightChange}
+      />
+      <div className="doc-editor-pane" style={{ height: editorHeight }}>
+        <div className="reference-tabs" role="group" aria-label="Preview as">
+          <button
+            className={`reference-tab ${viewMode === "markdown" ? "active" : ""}`}
+            onClick={() => onViewModeChange("markdown")}
+          >
+            Markdown
+          </button>
+          <button
+            className={`reference-tab ${viewMode === "mermaid" ? "active" : ""}`}
+            onClick={() => onViewModeChange("mermaid")}
+          >
+            Mermaid
+          </button>
+        </div>
+        <div className="doc-editor-monaco">
+          <Editor
+            height="100%"
+            language="markdown"
+            value={editorSource}
+            onChange={(value) => onEditorSourceChange(value ?? "")}
+            theme={theme === "dark" ? "vs-dark" : "vs"}
+            options={{
+              minimap: { enabled: false },
+              lineNumbers: "on",
+              scrollBeyondLastLine: false,
+              fontSize: 13,
+              wordWrap: "on",
+              automaticLayout: true,
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditorResizeHandle({
+  editorHeight,
+  onEditorHeightChange,
+}: {
+  editorHeight: number;
+  onEditorHeightChange: (height: number) => void;
+}): React.JSX.Element {
+  const draggingRef = React.useRef(false);
+  const dragStartY = React.useRef(0);
+  const dragStartHeight = React.useRef(editorHeight);
+
+  React.useEffect(() => {
+    dragStartHeight.current = editorHeight;
+  }, [editorHeight]);
+
+  function onDown(event: ReactPointerEvent): void {
+    event.preventDefault();
+    draggingRef.current = true;
+    dragStartY.current = event.clientY;
+    dragStartHeight.current = editorHeight;
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  function onMove(event: ReactPointerEvent): void {
+    if (!draggingRef.current) return;
+    // The editor sits below the handle, so dragging up (negative delta)
+    // should grow it and dragging down should shrink it.
+    const next = Math.max(
+      MIN_EDITOR_HEIGHT,
+      Math.min(
+        MAX_EDITOR_HEIGHT,
+        dragStartHeight.current + (dragStartY.current - event.clientY),
+      ),
+    );
+    onEditorHeightChange(next);
+  }
+
+  function onUp(event: ReactPointerEvent): void {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+  }
+
+  return (
+    <div
+      className="doc-editor-resize-handle"
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    />
   );
 }

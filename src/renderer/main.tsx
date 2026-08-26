@@ -14,6 +14,7 @@ import { usePanel } from "./hooks/use-panel";
 import { usePanZoom } from "./hooks/use-pan-zoom";
 import { useFileLoader } from "./hooks/use-file-loader";
 import { useMermaidRender } from "./hooks/use-mermaid-render";
+import { useDocumentEditor } from "./hooks/use-document-editor";
 import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
 import "./styles.css";
 
@@ -55,12 +56,24 @@ function App(): React.JSX.Element {
       });
   }, []);
 
-  // Stable ref so pan-zoom and comments hooks can read the latest document
-  // without re-creating their effects.
-  const documentRef = useRef<FileDocument | ParquetDocument | CodeGraphDocument | null>(null);
-  documentRef.current = document;
+  // 4. Live document editor (Markdown/Mermaid buffer + view-mode toggle) —
+  //    depends on document. With no document open yet, this is an empty
+  //    scratchpad the user can type Markdown or Mermaid into directly.
+  const {
+    editorSource,
+    setEditorSource,
+    viewMode,
+    setViewMode,
+    editorHeight,
+    handleEditorHeightChange,
+  } = useDocumentEditor(document);
 
-  // 4. Pan / zoom — depends on documentRef + viewportRef
+  const isTextDoc =
+    !document || (document.kind !== "parquet" && document.kind !== "code-graph");
+  const isMarkdown = isTextDoc && viewMode === "markdown";
+  const isMermaid = isTextDoc && viewMode === "mermaid";
+
+  // 5. Pan / zoom — depends on the Mermaid/Markdown toggle + viewportRef
   const {
     transform,
     setTransform,
@@ -69,9 +82,9 @@ function App(): React.JSX.Element {
     beginPan,
     movePan,
     endPan,
-  } = usePanZoom(documentRef, viewportRef);
+  } = usePanZoom(isMermaid, viewportRef);
 
-  // 5. File loader — depends on set{Document,Files,History,Directory,Error}
+  // 6. File loader — depends on set{Document,Files,History,Directory,Error}
   //    onFileOpened resets zoom + editor whenever a new file loads.
   const { loadFile, chooseFile } = useFileLoader({
     setDocument,
@@ -127,16 +140,18 @@ function App(): React.JSX.Element {
     });
   };
 
-  // Mermaid rendering — depends on document + theme + refs.
+  // Mermaid rendering — depends on document + theme + refs + edited source.
   useMermaidRender({
     document,
     theme,
     previewRef,
     onRendered: fitDiagram,
     setError,
+    editorSource,
+    isMermaidView: isMermaid,
   });
 
-  // 8. Keyboard shortcuts — depends on callbacks
+  // 7. Keyboard shortcuts — depends on callbacks
   useKeyboardShortcuts({
     chooseFile,
     zoomAtCenter,
@@ -148,16 +163,14 @@ function App(): React.JSX.Element {
   const renderedHtml = useMemo(
     () => ({
       __html:
-        document && document.kind !== "parquet" && document.kind !== "code-graph"
-          ? document.kind === "mermaid"
-            ? renderMermaid(document.content)
-            : renderMarkdown(document.content)
+        isTextDoc && editorSource.trim()
+          ? viewMode === "mermaid"
+            ? renderMermaid(editorSource)
+            : renderMarkdown(editorSource)
           : "",
     }),
-    [document, theme],
+    [isTextDoc, theme, editorSource, viewMode],
   );
-  const isMarkdown = document?.kind === "markdown";
-  const isMermaid = document?.kind === "mermaid";
   const isCodeGraph = document?.kind === "code-graph";
 
   // ─────────── Render ───────────
@@ -200,6 +213,13 @@ function App(): React.JSX.Element {
           isMermaid={!!isMermaid}
           transform={transform}
           isPanning={isPanning}
+          theme={theme}
+          editorSource={editorSource}
+          onEditorSourceChange={setEditorSource}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          editorHeight={editorHeight}
+          onEditorHeightChange={handleEditorHeightChange}
           onError={setError}
           onBeginPan={isMermaid ? beginPan : undefined}
           onMovePan={isMermaid ? movePan : undefined}

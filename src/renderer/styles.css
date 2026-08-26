@@ -1539,6 +1539,46 @@ button {
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
+/* Live document editor workspace — a preview pane (Markdown article or
+   Mermaid canvas, chosen by the tabs below) stacked over a resizable source
+   editor docked across the lower half, mermaid.live-style but split
+   top/bottom instead of left/right. */
+.doc-workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.doc-workspace-canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.doc-editor-resize-handle {
+  flex: 0 0 auto;
+  height: 4px;
+  background: var(--border-soft);
+  cursor: row-resize;
+  touch-action: none;
+}
+.doc-editor-resize-handle:hover,
+.doc-editor-resize-handle:active {
+  background: var(--border-strong);
+}
+.doc-editor-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-height: 100px;
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+.doc-editor-monaco {
+  flex: 1;
+  min-height: 0;
+}
 .mermaid-mode .mermaid-error {
   max-width: min(720px, calc(100vw - 48px));
   margin: 0 auto;
