@@ -47,6 +47,7 @@ flowchart TD
     Q3["Lazy queryParquet branch — no filter and no sort reads requested row range only — in: {page:3} -> out: rows 200..299, totalMatching=num_rows, truncated=false"]
     Q4["Materialized query branch — reads up to PARQUET_QUERY_ROW_CAP=200000 rows and caches by path+mtime — in: {filter:'PERSON 7',sortColumn:'age'} -> out: filtered/sorted page, totalMatching, truncated"]
     Q5["Row helpers — matchesFilter requires every term across cellText values; compareCells is type-aware with nulls last — in: row {name:'Person 7',age:27} -> out: true for 'PERSON 7'; numeric ordering"]
+    Q1 ~~~ Q2 ~~~ Q3 ~~~ Q4 ~~~ Q5
     Q1 -->|"1. hyparquet metadata + parquetSchema; readParquetRows(0,min(100,totalRows))"| Q2
     Q2 -->|"2. debounce filter 250ms; query {page,filter,sortColumn,sortDirection}"| Q3
     Q2 -->|"2a. same typed query, with filter or sort"| Q4
@@ -62,6 +63,7 @@ flowchart TD
     U3["Diagram comments — click SVG node, edit text, serialize sidecar — in: '[P4] (line 42): review' -> out: `<name>_review.txt` and highlighted node"]
     U4["History (history.ts) — de-duplicates and keeps newest 12 localStorage entries, groups by directory — in: repeated /repo/a.md -> out: one newest entry"]
     U5["PomodoroTimer + pomodoro-logic — one-second tick while running, 25/5/15 minute defaults, long break every 4 work sessions — in: work 00:01 -> out: paused short/long break and Web Audio chime"]
+    U1 ~~~ U2 ~~~ U3 ~~~ U4 ~~~ U5
     U1 -->|"1. button click or open-path event -> loadFile"| S4
     U2 -->|"2. wheel/pinch/button -> ViewTransform {scale,x,y}"| R3
     U3 -->|"3. parseSidecar/serializeSidecar through read/writeSidecar IPC"| O4
@@ -88,6 +90,7 @@ flowchart TD
     F3["filtered Parquet result says first 200000 rows scanned — cause: query cap protects memory on larger files; fix: use unfiltered lazy paging or query within the scanned prefix; in: >200000-row file -> out: explicit truncated=true"]
     F4["build or test fails — cause: TypeScript, Vite, Electron, or fixture regression; fix: run npm run typecheck, npm test, then build:main/build:renderer to isolate stage; in: failing command -> out: stage-specific diagnostic"]
     F5["comment is not visible after reload — cause: sidecar tag/path differs or line does not match current source; fix: verify `<document>_<sanitized-tag>.txt` beside the source and update node line; in: sidecar line -> out: parsed highlight"]
+    F1 ~~~ F2 ~~~ F3 ~~~ F4 ~~~ F5
   end
 
   S6 -->|"document state feeds renderer and history"| R1

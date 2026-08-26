@@ -4,7 +4,6 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { FileDocument, ParquetDocument, CodeGraphDocument } from "../../shared/types";
 import {
   panBy,
   resetTransform,
@@ -27,7 +26,7 @@ export interface UsePanZoomResult {
 }
 
 export function usePanZoom(
-  documentRef: React.RefObject<FileDocument | ParquetDocument | CodeGraphDocument | null>,
+  isMermaidView: boolean,
   viewportRef: React.RefObject<HTMLDivElement | null>,
 ): UsePanZoomResult {
   const [transform, setTransform] = useState<ViewTransform>(() =>
@@ -47,7 +46,7 @@ export function usePanZoom(
     const viewport = viewportRef.current;
     if (!viewport) return;
     const onWheel = (event: WheelEvent) => {
-      if (documentRef.current?.kind !== "mermaid") return;
+      if (!isMermaidView) return;
       event.preventDefault();
       const rect = viewport.getBoundingClientRect();
       const px = event.clientX - rect.left;
@@ -84,7 +83,7 @@ export function usePanZoom(
     };
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
-  }, [documentRef.current?.kind]);
+  }, [isMermaidView]);
 
   // ────────────────────────────────────────────────────────────
   // Zoom-to-center helper (used by toolbar buttons + shortcuts)

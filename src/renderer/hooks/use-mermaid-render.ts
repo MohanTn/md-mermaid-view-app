@@ -19,6 +19,14 @@ interface UseMermaidRenderParams {
   /** Called once the canvas diagram has an SVG sized in pixels. */
   onRendered?: () => void;
   setError: (msg: string) => void;
+  /**
+   * Live-edited source for the current document. Not read directly (the
+   * effect re-reads the already-updated `data-diagram` DOM attribute) — only
+   * included so edits made in the editor trigger a re-render.
+   */
+  editorSource?: string;
+  /** True when the editor's Mermaid/Markdown toggle is set to Mermaid. */
+  isMermaidView: boolean;
 }
 
 /**
@@ -42,6 +50,8 @@ export function useMermaidRender({
   previewRef,
   onRendered,
   setError,
+  editorSource,
+  isMermaidView,
 }: UseMermaidRenderParams): void {
   // ──────────────────────────────────────────────────────────────
   // Main render effect — fires when the document or theme changes
@@ -76,7 +86,7 @@ export function useMermaidRender({
               throw new Error("Mermaid returned no SVG output.");
             // Only the standalone canvas needs a pixel-sized SVG; inside a
             // Markdown article the diagram should shrink to the column.
-            if (document?.kind === "mermaid") {
+            if (isMermaidView) {
               sizeSvgToViewBox(node);
               onRendered?.();
             }
@@ -110,6 +120,6 @@ export function useMermaidRender({
     return () => {
       cancelled = true;
     };
-  }, [document, theme]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [document, theme, editorSource, isMermaidView]); // eslint-disable-line react-hooks/exhaustive-deps
 
 }
