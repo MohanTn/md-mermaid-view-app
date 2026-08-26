@@ -9,7 +9,7 @@ import {
   panBy,
   resetTransform,
   wheelDeltaToPixels,
-  zoomAt,
+  zoomAtOrigin,
   type ViewTransform,
 } from "../zoom-pan";
 
@@ -58,7 +58,16 @@ export function usePanZoom(
           event.deltaMode,
           rect.height,
         );
-        setTransform((cur) => zoomAt(cur, px, py, Math.exp(-pixels * 0.002)));
+        setTransform((cur) =>
+          zoomAtOrigin(
+            cur,
+            px,
+            py,
+            Math.exp(-pixels * 0.002),
+            rect.width / 2,
+            rect.height / 2,
+          ),
+        );
       } else {
         const dx = wheelDeltaToPixels(
           event.deltaX,
@@ -75,7 +84,7 @@ export function usePanZoom(
     };
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [documentRef.current?.kind]);
 
   // ────────────────────────────────────────────────────────────
   // Zoom-to-center helper (used by toolbar buttons + shortcuts)
@@ -84,7 +93,16 @@ export function usePanZoom(
     const viewport = viewportRef.current;
     if (!viewport) return;
     const rect = viewport.getBoundingClientRect();
-    setTransform((cur) => zoomAt(cur, rect.width / 2, rect.height / 2, factor));
+    setTransform((cur) =>
+      zoomAtOrigin(
+        cur,
+        rect.width / 2,
+        rect.height / 2,
+        factor,
+        rect.width / 2,
+        rect.height / 2,
+      ),
+    );
   }
 
   // ────────────────────────────────────────────────────────────
@@ -106,7 +124,7 @@ export function usePanZoom(
         ),
       };
       setIsPanning(true);
-    } else if (pointersRef.current.size === 1 && transform.scale > 1) {
+    } else if (pointersRef.current.size === 1) {
       event.currentTarget.setPointerCapture(event.pointerId);
       panOrigin.current = { x: event.clientX, y: event.clientY };
       panStart.current = transform;
@@ -131,7 +149,9 @@ export function usePanZoom(
       const midY = (points[0].y + points[1].y) / 2 - rect.top;
       const factor = newDistance / pinchRef.current.distance;
       pinchRef.current.distance = newDistance;
-      setTransform((cur) => zoomAt(cur, midX, midY, factor));
+      setTransform((cur) =>
+        zoomAtOrigin(cur, midX, midY, factor, rect.width / 2, rect.height / 2),
+      );
       panMovedRef.current = true;
     } else if (pointersRef.current.size === 1 && isPanning) {
       if (

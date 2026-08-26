@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "outDir": "dist-web",
+    "rootDir": "src",
+    "declaration": false,
+    "sourceMap": true
+  },
+  "include": ["src/web/**/*.ts", "src/web/**/*.d.ts", "src/main/file-service.ts", "src/main/code-graph.ts", "src/main/lsp-manager.ts", "src/shared/**/*.ts"]
+}

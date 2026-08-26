@@ -1,0 +1,14 @@
+services:
+  orbit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5222:5222"
+    environment:
+      PORT: 5222
+      HOST: 0.0.0.0
+      WORKSPACE_ROOT: /workspace
+    volumes:
+      - ./workspace:/workspace
+    restart: unless-stopped

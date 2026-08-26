@@ -22,7 +22,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview --config vite.config.ts"
+    "preview": "vite preview --config vite.config.ts",
+    "build:web": "npm run typecheck && npm run build:web:server && npm run build:web:renderer",
+    "build:web:server": "tsc -p tsconfig.web.json",
+    "build:web:renderer": "vite build --config vite.web.config.ts",
+    "start:web": "node dist-web/web/server.js"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

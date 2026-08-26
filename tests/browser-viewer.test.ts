@@ -40,4 +40,48 @@ describe('browser viewer adapter', () => {
     await api.writeSidecar('browser://one', 'review', 'comment');
     expect(await api.readSidecar('browser://one', 'review')).toBe('comment');
   });
+
+  it('uses the hosted API for workspace files', async () => {
+    const previousWebMode = window.__ORBIT_WEB__;
+    window.__ORBIT_WEB__ = true;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/files')) {
+        return { ok: true, json: async () => [{ path: 'web://workspace/readme.md', name: 'readme.md', kind: 'markdown' }] };
+      }
+      return { ok: true, json: async () => ({ path: 'web://workspace/readme.md', name: 'readme.md', kind: 'markdown', content: '# Hosted', updatedAt: 1 }) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const api = createBrowserViewerApi();
+      expect(await api.listDirectory('web://workspace')).toMatchObject([{ name: 'readme.md' }]);
+      expect(await api.openPath('web://workspace/readme.md')).toMatchObject({ content: '# Hosted' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      window.__ORBIT_WEB__ = previousWebMode;
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not ask the hosted API to list a picked file\'s directory', async () => {
+    const previousWebMode = window.__ORBIT_WEB__;
+    window.__ORBIT_WEB__ = true;
+    // The server rejects anything outside the workspace root, so a
+    // `browser://` directory must never reach it.
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({ error: 'Invalid workspace path.' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const api = createBrowserViewerApi();
+      expect(await api.listDirectory('browser:/')).toEqual([]);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      window.__ORBIT_WEB__ = previousWebMode;
+      vi.unstubAllGlobals();
+    }
+  });
 });

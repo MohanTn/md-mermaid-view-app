@@ -1,19 +1,17 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { installBrowserViewer } from "./browser-viewer";
 import type { FileDocument, FileEntry, ParquetDocument, CodeGraphDocument } from "../shared/types";
 import { SCAN_CANCELLED_MESSAGE } from "../shared/types";
 import { readHistory, type HistoryEntry } from "./history";
 import { renderMarkdown, renderMermaid } from "./markdown";
-import { resetTransform } from "./zoom-pan";
+import { fitScale, resetTransform } from "./zoom-pan";
 import { FileList } from "./components/file-list";
 import { Toolbar } from "./components/toolbar";
-import { CommentsPanel } from "./components/comments-panel";
 import { ContentArea } from "./components/content-area";
 import { useTheme } from "./hooks/use-theme";
 import { usePanel } from "./hooks/use-panel";
 import { usePanZoom } from "./hooks/use-pan-zoom";
-import { useComments } from "./hooks/use-comments";
 import { useFileLoader } from "./hooks/use-file-loader";
 import { useMermaidRender } from "./hooks/use-mermaid-render";
 import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
@@ -44,6 +42,19 @@ function App(): React.JSX.Element {
   const [directory, setDirectory] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (!window.__ORBIT_WEB__) return;
+    void window.viewer
+      .listDirectory("web://workspace")
+      .then((entries) => {
+        setFiles(entries);
+        setDirectory("web://workspace");
+      })
+      .catch((loadError: unknown) => {
+        setError(loadError instanceof Error ? loadError.message : String(loadError));
+      });
+  }, []);
+
   // Stable ref so pan-zoom and comments hooks can read the latest document
   // without re-creating their effects.
   const documentRef = useRef<FileDocument | ParquetDocument | CodeGraphDocument | null>(null);
@@ -58,7 +69,6 @@ function App(): React.JSX.Element {
     beginPan,
     movePan,
     endPan,
-    panMovedRef,
   } = usePanZoom(documentRef, viewportRef);
 
   // 5. File loader — depends on set{Document,Files,History,Directory,Error}
@@ -99,33 +109,30 @@ function App(): React.JSX.Element {
     void window.viewer.cancelScan();
   };
 
-  // 6. Comments — depends on document/ref + setError + viewportRef
-  const {
-    comments,
-    commentTag,
-    setCommentTag,
-    commentsOpen,
-    setCommentsOpen,
-    copied,
-    editor,
-    setEditor,
-    addComment,
-    removeComment,
-    copyComments,
-    openCommentEditor,
-    saveEditorComment,
-    commentsRef,
-    editorTextRef,
-  } = useComments({ document, documentRef, setError, viewportRef });
+  // Scales the diagram down so the whole thing is visible, the way a fresh
+  // canvas should open. Large diagrams are far wider than any viewport.
+  const fitDiagram = (): void => {
+    const viewport = viewportRef.current;
+    const svg = previewRef.current?.querySelector("svg");
+    if (!viewport || !svg) {
+      setTransform(resetTransform());
+      return;
+    }
+    const rect = viewport.getBoundingClientRect();
+    const box = svg.viewBox.baseVal;
+    setTransform({
+      x: 0,
+      y: 0,
+      scale: fitScale(box.width, box.height, rect.width, rect.height),
+    });
+  };
 
-  // 7. Mermaid rendering — depends on document + theme + refs + callbacks
+  // Mermaid rendering — depends on document + theme + refs.
   useMermaidRender({
     document,
     theme,
     previewRef,
-    commentsRef,
-    panMovedRef,
-    openCommentEditor,
+    onRendered: fitDiagram,
     setError,
   });
 
@@ -156,7 +163,7 @@ function App(): React.JSX.Element {
   // ─────────── Render ───────────
   return (
     <main
-      className={collapsed ? "app collapsed" : "app"}
+      className={`${collapsed ? "app collapsed" : "app"} ${isMermaid ? "mermaid-mode" : ""}`}
       style={
         collapsed
           ? undefined
@@ -178,31 +185,11 @@ function App(): React.JSX.Element {
           document={document}
           collapsed={collapsed}
           theme={theme}
-          transform={transform}
-          isMermaid={!!isMermaid}
-          commentsOpen={commentsOpen}
-          commentsCount={comments.length}
           onTogglePanel={toggleCollapsed}
           onChooseFile={chooseFile}
           onThemeToggle={toggleTheme}
-          onZoomIn={() => zoomAtCenter(1.25)}
-          onZoomOut={() => zoomAtCenter(0.8)}
-          onZoomReset={() => setTransform(resetTransform())}
-          onToggleComments={() => setCommentsOpen((c) => !c)}
           onOpenWorkspace={openWorkspace}
         />
-        {commentsOpen && isMermaid && document && (
-          <CommentsPanel
-            document={document as FileDocument}
-            comments={comments}
-            commentTag={commentTag}
-            copied={copied}
-            onCommentTagChange={setCommentTag}
-            onRemoveComment={removeComment}
-            onCopyComments={copyComments}
-            onClose={() => setCommentsOpen(false)}
-          />
-        )}
         {error && <div className="error-banner">{error}</div>}
         <ContentArea
           isScanning={isScanning}
@@ -213,16 +200,15 @@ function App(): React.JSX.Element {
           isMermaid={!!isMermaid}
           transform={transform}
           isPanning={isPanning}
-          editor={editor}
           onError={setError}
-          onSaveEditor={saveEditorComment}
-          onCancelEditor={() => setEditor(null)}
           onBeginPan={isMermaid ? beginPan : undefined}
           onMovePan={isMermaid ? movePan : undefined}
           onEndPan={isMermaid ? endPan : undefined}
+          onZoomIn={() => zoomAtCenter(1.25)}
+          onZoomOut={() => zoomAtCenter(0.8)}
+          onZoomReset={fitDiagram}
           viewportRef={viewportRef}
           previewRef={previewRef}
-          editorTextRef={editorTextRef}
         />
       </section>
     </main>

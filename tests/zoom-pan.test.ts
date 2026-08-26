@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { clampScale, panBy, resetTransform, wheelDeltaToPixels, zoomAt } from '../src/renderer/zoom-pan';
+import { clampScale, fitScale, panBy, resetTransform, wheelDeltaToPixels, zoomAt, zoomAtOrigin } from '../src/renderer/zoom-pan';
 
 describe('zoom and pan', () => {
   it('clamps zoom to the allowed range', () => {
-    expect(clampScale(0.05)).toBe(0.25);
+    expect(clampScale(0.001)).toBe(0.05);
     expect(clampScale(20)).toBe(8);
     expect(clampScale(1.5)).toBe(1.5);
   });
@@ -29,8 +29,26 @@ describe('zoom and pan', () => {
     expect(contentY * zoomed.scale + zoomed.y).toBe(200);
   });
 
+  it('keeps the viewport center fixed when zooming a centered diagram', () => {
+    const zoomed = zoomAtOrigin(resetTransform(), 400, 300, 2, 400, 300);
+    expect(zoomed).toEqual({ scale: 2, x: 0, y: 0 });
+
+    const moved = zoomAtOrigin({ scale: 2, x: 40, y: -20 }, 500, 250, 0.5, 400, 300);
+    expect(moved.scale).toBe(1);
+    expect((500 - 400 - moved.x) / moved.scale).toBe((500 - 400 - 40) / 2);
+    expect((250 - 300 - moved.y) / moved.scale).toBe((250 - 300 + 20) / 2);
+  });
+
   it('pans without changing scale', () => {
     expect(panBy(resetTransform(), 24, -8)).toEqual({ scale: 1, x: 24, y: -8 });
+  });
+
+  it('fits large content in the viewport and never enlarges small content', () => {
+    // A 5062x4423 diagram in a 1400x852 viewport, 24px padding per side.
+    expect(fitScale(5062, 4423, 1400, 852)).toBeCloseTo(804 / 4423, 5);
+    expect(fitScale(200, 100, 1400, 852)).toBe(1);
+    expect(fitScale(0, 0, 1400, 852)).toBe(1);
+    expect(fitScale(100000, 100000, 1400, 852)).toBe(0.05);
   });
 
   it('normalizes wheel deltas from lines and pages to pixels', () => {

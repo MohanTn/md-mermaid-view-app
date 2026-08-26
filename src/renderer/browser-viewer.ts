@@ -1,17 +1,23 @@
 import type {
+  CodeGraphDocument,
   FileDocument,
   FileEntry,
+  NodeDetail,
   ParquetDocument,
   ParquetPage,
+  ParquetQuery,
   ParquetQueryResult,
   ViewerApi,
-  CodeGraphDocument,
-  NodeDetail,
 } from "../shared/types";
 
 interface BrowserFile {
   path: string;
   document: FileDocument;
+}
+
+interface WebConfig {
+  enabled: boolean;
+  apiBase: string;
 }
 
 function documentKind(name: string): FileDocument["kind"] | null {
@@ -27,38 +33,86 @@ function sidecarKey(filePath: string, tag: string): string {
   return `md-mermaid-viewer-browser-sidecar:${filePath}:${safeTag}`;
 }
 
+function webConfig(): WebConfig {
+  const enabled = Boolean(window.__ORBIT_WEB__);
+  return { enabled, apiBase: "" };
+}
+
+async function apiRequest<T>(
+  config: WebConfig,
+  pathname: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`${config.apiBase}${pathname}`, {
+    ...init,
+    headers: { ...(init?.body ? { "Content-Type": "application/json" } : {}), ...init?.headers },
+  });
+  const body = await response.json().catch(() => null) as { error?: string } | T | null;
+  if (!response.ok) {
+    throw new Error(
+      body && typeof body === "object" && "error" in body && body.error
+        ? body.error
+        : `Request failed (${response.status}).`,
+    );
+  }
+  return body as T;
+}
+
+function apiPath(pathname: string, params: Record<string, string | number>): string {
+  const query = new URLSearchParams(
+    Object.entries(params).map(([key, value]) => [key, String(value)]),
+  );
+  return `${pathname}?${query.toString()}`;
+}
+
 function unsupportedParquet(): never {
   throw new Error(
-    "Parquet files are available in the Electron app; browser preview supports Markdown and Mermaid files.",
+    "Parquet files are available in the hosted web app or Electron app.",
   );
 }
 
 /**
- * Small in-memory/browser-storage implementation used when the renderer is
- * opened through Vite instead of Electron. It keeps the renderer interactive
- * without pretending a browser can access arbitrary local paths.
+ * Browser implementation used for Vite preview and the hosted web app.
+ * Hosted mode is enabled by the web server's injected marker and uses the
+ * mounted workspace through HTTP; plain Vite mode remains local-file only.
  */
 export function createBrowserViewerApi(): ViewerApi {
   const files = new Map<string, BrowserFile>();
   let nextId = 1;
+  const config = webConfig();
 
   const openBrowserFile = async (file: File): Promise<FileDocument> => {
     const kind = documentKind(file.name);
-    if (!kind)
+    if (!kind) {
       throw new Error(
         "Choose a Markdown (.md, .markdown) or Mermaid (.mmd, .mermaid) file.",
       );
-    const path = `browser://${nextId++}-${encodeURIComponent(file.name)}`;
+    }
+    const filePath = `browser://${nextId++}-${encodeURIComponent(file.name)}`;
     const document: FileDocument = {
-      path,
+      path: filePath,
       name: file.name,
       kind,
       content: await file.text(),
       updatedAt: file.lastModified || Date.now(),
     };
-    files.set(path, { path, document });
+    files.set(filePath, { path: filePath, document });
     return document;
   };
+
+  const listHostedFiles = async (directoryPath?: string): Promise<FileEntry[]> => {
+    const directory = directoryPath ?? "web://workspace";
+    return apiRequest<FileEntry[]>(
+      config,
+      apiPath("/api/files", { directory }),
+    );
+  };
+
+  const openHostedDocument = async (filePath: string): Promise<FileDocument> =>
+    apiRequest<FileDocument>(config, apiPath("/api/document", { path: filePath }));
+
+  const openHostedParquet = async (filePath: string): Promise<ParquetDocument> =>
+    apiRequest<ParquetDocument>(config, apiPath("/api/parquet", { path: filePath }));
 
   return {
     async chooseFile(): Promise<FileDocument | null> {
@@ -89,20 +143,29 @@ export function createBrowserViewerApi(): ViewerApi {
     },
 
     async openPath(filePath: string): Promise<FileDocument> {
-      const file = files.get(filePath);
-      if (!file)
-        throw new Error(
-          "That browser-preview file is no longer available. Choose it again.",
-        );
-      return file.document;
+      const localFile = files.get(filePath);
+      if (localFile) return localFile.document;
+      if (config.enabled && filePath.startsWith("web://")) {
+        return openHostedDocument(filePath);
+      }
+      throw new Error(
+        "That browser-preview file is no longer available. Choose it again.",
+      );
     },
 
-    async listDirectory(): Promise<FileEntry[]> {
-      return Array.from(files.values()).map(({ document }) => ({
+    async listDirectory(directoryPath?: string): Promise<FileEntry[]> {
+      const localFiles = Array.from(files.values()).map(({ document }) => ({
         path: document.path,
         name: document.name,
         kind: document.kind,
       }));
+      // A picked file lives at `browser://…`, so its containing directory is
+      // not a workspace path — asking the server for it fails the root check.
+      const hosted =
+        config.enabled &&
+        (directoryPath === undefined || directoryPath.startsWith("web://"));
+      if (!hosted) return localFiles;
+      return [...(await listHostedFiles(directoryPath)), ...localFiles];
     },
 
     onOpenPath(): () => void {
@@ -110,6 +173,13 @@ export function createBrowserViewerApi(): ViewerApi {
     },
 
     async readSidecar(filePath: string, tag: string): Promise<string> {
+      if (config.enabled && filePath.startsWith("web://")) {
+        const result = await apiRequest<{ content: string }>(
+          config,
+          apiPath("/api/sidecar", { path: filePath, tag }),
+        );
+        return result.content;
+      }
       return window.localStorage.getItem(sidecarKey(filePath, tag)) ?? "";
     },
 
@@ -118,6 +188,13 @@ export function createBrowserViewerApi(): ViewerApi {
       tag: string,
       content: string,
     ): Promise<string> {
+      if (config.enabled && filePath.startsWith("web://")) {
+        const result = await apiRequest<{ path: string }>(config, "/api/sidecar", {
+          method: "PUT",
+          body: JSON.stringify({ path: filePath, tag, content }),
+        });
+        return result.path;
+      }
       window.localStorage.setItem(sidecarKey(filePath, tag), content);
       return `${filePath}_${tag}.txt`;
     },
@@ -137,32 +214,80 @@ export function createBrowserViewerApi(): ViewerApi {
       textarea.remove();
     },
 
-    async openParquet(): Promise<ParquetDocument> {
-      return unsupportedParquet();
-    },
-    async openParquetPage(): Promise<ParquetPage> {
-      return unsupportedParquet();
-    },
-    async queryParquet(): Promise<ParquetQueryResult> {
+    async openParquet(filePath: string): Promise<ParquetDocument> {
+      if (config.enabled && filePath.startsWith("web://")) return openHostedParquet(filePath);
       return unsupportedParquet();
     },
 
-    // ── Code graph (browser unsupported) ──
+    async openParquetPage(
+      filePath: string,
+      rowStart: number,
+      rowEnd: number,
+    ): Promise<ParquetPage> {
+      if (!config.enabled || !filePath.startsWith("web://")) return unsupportedParquet();
+      return apiRequest<ParquetPage>(
+        config,
+        apiPath("/api/parquet/page", { path: filePath, rowStart, rowEnd }),
+      );
+    },
+
+    async queryParquet(
+      filePath: string,
+      query: ParquetQuery,
+    ): Promise<ParquetQueryResult> {
+      if (!config.enabled || !filePath.startsWith("web://")) return unsupportedParquet();
+      return apiRequest<ParquetQueryResult>(config, "/api/parquet/query", {
+        method: "POST",
+        body: JSON.stringify({ path: filePath, query }),
+      });
+    },
+
     async openWorkspace(): Promise<CodeGraphDocument | null> {
-      throw new Error("Code graph is available in the Electron app only.");
+      if (!config.enabled) {
+        throw new Error("Code graph is available in the hosted web app or Electron app.");
+      }
+      return this.scanWorkspace("web://workspace");
     },
-    async scanWorkspace(): Promise<CodeGraphDocument> {
-      throw new Error("Code graph is available in the Electron app only.");
+
+    async scanWorkspace(directoryPath: string): Promise<CodeGraphDocument> {
+      if (!config.enabled) {
+        throw new Error("Code graph is available in the hosted web app or Electron app.");
+      }
+      return apiRequest<CodeGraphDocument>(config, "/api/graph/scan", {
+        method: "POST",
+        body: JSON.stringify({ directoryPath }),
+      });
     },
+
     async cancelScan(): Promise<void> {
-      // No-op: the browser dev preview never starts a scan to cancel.
+      if (config.enabled) {
+        await apiRequest(config, "/api/graph/cancel", { method: "POST" });
+      }
     },
-    async getNodeDetail(): Promise<NodeDetail> {
-      throw new Error("Code graph is available in the Electron app only.");
+
+    async getNodeDetail(nodeId: string): Promise<NodeDetail> {
+      if (!config.enabled) {
+        throw new Error("Code graph is available in the hosted web app or Electron app.");
+      }
+      return apiRequest<NodeDetail>(
+        config,
+        apiPath("/api/graph/node", { nodeId }),
+      );
     },
-    async saveGraphLayout(): Promise<void> {
-      throw new Error("Code graph is available in the Electron app only.");
+
+    async saveGraphLayout(
+      workspaceRoot: string,
+      positions: Record<string, { x: number; y: number }>,
+    ): Promise<void> {
+      if (!config.enabled) {
+        throw new Error("Code graph is available in the hosted web app or Electron app.");
+      }
+      await apiRequest(config, "/api/graph/layout", {
+        method: "PUT",
+        body: JSON.stringify({ workspaceRoot, positions }),
+      });
     },
+
     onScanProgress(): () => void {
       return () => undefined;
     },
