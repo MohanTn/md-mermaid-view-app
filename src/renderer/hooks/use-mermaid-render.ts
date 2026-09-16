@@ -9,6 +9,14 @@ function mermaidConfig(theme: Theme): MermaidConfig {
     startOnLoad: false,
     securityLevel: "strict",
     theme: theme === "dark" ? "dark" : "default",
+    flowchart: {
+      htmlLabels: true,
+      // Mermaid wraps node/edge label text at this pixel width before
+      // sizing the label box. The default (200px) is narrow enough that
+      // long labels wrap into a cramped column and the box can end up
+      // smaller than the rendered text. Widen it so boxes size to fit.
+      wrappingWidth: 320,
+    },
   };
 }
 

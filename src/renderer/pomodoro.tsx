@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  DEFAULT_DURATIONS,
   LONG_BREAK_EVERY,
   MODE_LABELS,
   type PomodoroDurations,
@@ -8,76 +7,33 @@ import {
   type PomodoroState,
   cycleProgress,
   formatTime,
-  initialState,
-  pause,
-  reset,
-  setMode,
-  start,
-  tick,
 } from "./pomodoro-logic";
 
 const MODES: PomodoroMode[] = ["work", "short", "long"];
 
-// Pleasant two-tone chime generated with the Web Audio API (no audio asset).
-let audioContext: AudioContext | null = null;
-function playChime(): void {
-  try {
-    const AudioContextCtor =
-      window.AudioContext ??
-      (window as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioContextCtor) return;
-    audioContext ??= new AudioContextCtor();
-    void audioContext.resume();
-    const now = audioContext.currentTime;
-    const notes = [880, 1174.66]; // A5, D6
-    notes.forEach((frequency, index) => {
-      const start = now + index * 0.28;
-      const oscillator = audioContext!.createOscillator();
-      const gain = audioContext!.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.5, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 1.2);
-      oscillator.connect(gain);
-      gain.connect(audioContext!.destination);
-      oscillator.start(start);
-      oscillator.stop(start + 1.3);
-    });
-  } catch {
-    // Audio unavailable in this environment — ignore.
-  }
+export interface PomodoroTimerProps {
+  state: PomodoroState;
+  durations: PomodoroDurations;
+  activeTaskTitle: string | null;
+  onStart: () => void;
+  onPause: () => void;
+  onReset: () => void;
+  onModeChange: (mode: PomodoroMode) => void;
+  onDurationChange: (mode: PomodoroMode, delta: number) => void;
 }
 
-export function PomodoroTimer(): React.JSX.Element {
+export function PomodoroTimer({
+  state,
+  durations,
+  activeTaskTitle,
+  onStart,
+  onPause,
+  onReset,
+  onModeChange,
+  onDurationChange,
+}: PomodoroTimerProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const [durations, setDurations] =
-    useState<PomodoroDurations>(DEFAULT_DURATIONS);
-  const [state, setState] = useState<PomodoroState>(() => initialState());
   const rootRef = useRef<HTMLDivElement>(null);
-  const completedRef = useRef(false);
-
-  // Tick once per second while running; flag when a session completes.
-  useEffect(() => {
-    if (!state.running) return;
-    const id = window.setInterval(() => {
-      setState((current) => {
-        const next = tick(current, durations);
-        if (next.mode !== current.mode) completedRef.current = true;
-        return next;
-      });
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [state.running, durations]);
-
-  // Chime when a session just completed (the flag is only set by the tick above,
-  // never by manual mode switches or resets).
-  useEffect(() => {
-    if (!completedRef.current) return;
-    completedRef.current = false;
-    playChime();
-  }, [state]);
 
   // Close the panel on outside click or Escape.
   useEffect(() => {
@@ -99,13 +55,14 @@ export function PomodoroTimer(): React.JSX.Element {
 
   const cycle = cycleProgress(state);
   const runningClass = state.running ? "running" : "";
+  const taskSuffix = activeTaskTitle ? ` — ${activeTaskTitle}` : "";
 
   return (
     <div className="pomodoro" ref={rootRef}>
       <button
         className={`pomodoro-chip ${runningClass} mode-${state.mode}`}
         onClick={() => setOpen((current) => !current)}
-        title={`Pomodoro — ${MODE_LABELS[state.mode]} (${formatTime(state.secondsLeft)})`}
+        title={`Pomodoro — ${MODE_LABELS[state.mode]} (${formatTime(state.secondsLeft)})${taskSuffix}`}
         aria-expanded={open}
       >
         <span className="pomodoro-dot" aria-hidden="true" />
@@ -122,7 +79,7 @@ export function PomodoroTimer(): React.JSX.Element {
               <button
                 key={mode}
                 className={`pomodoro-mode ${state.mode === mode ? "active" : ""}`}
-                onClick={() => setState(setMode(state, mode, durations))}
+                onClick={() => onModeChange(mode)}
               >
                 {MODE_LABELS[mode]}
               </button>
@@ -151,26 +108,21 @@ export function PomodoroTimer(): React.JSX.Element {
             </span>
           </div>
 
+          <div className="pomodoro-task" title={activeTaskTitle ?? undefined}>
+            {activeTaskTitle ?? "No task — time is not being recorded"}
+          </div>
+
           <div className="pomodoro-actions">
             {state.running ? (
-              <button
-                className="pomodoro-action"
-                onClick={() => setState(pause(state))}
-              >
+              <button className="pomodoro-action" onClick={onPause}>
                 Pause
               </button>
             ) : (
-              <button
-                className="pomodoro-action primary"
-                onClick={() => setState(start(state))}
-              >
+              <button className="pomodoro-action primary" onClick={onStart}>
                 Start
               </button>
             )}
-            <button
-              className="pomodoro-action"
-              onClick={() => setState(reset(state, durations))}
-            >
+            <button className="pomodoro-action" onClick={onReset}>
               Reset
             </button>
           </div>
@@ -180,12 +132,7 @@ export function PomodoroTimer(): React.JSX.Element {
               <label key={mode} className="pomodoro-duration">
                 <span>{MODE_LABELS[mode].split(" ")[0]}</span>
                 <button
-                  onClick={() =>
-                    setDurations((current) => ({
-                      ...current,
-                      [mode]: Math.max(1, current[mode] - 1),
-                    }))
-                  }
+                  onClick={() => onDurationChange(mode, -1)}
                   title={`Decrease ${MODE_LABELS[mode]} duration`}
                 >
                   −
@@ -194,12 +141,7 @@ export function PomodoroTimer(): React.JSX.Element {
                   {durations[mode]}m
                 </span>
                 <button
-                  onClick={() =>
-                    setDurations((current) => ({
-                      ...current,
-                      [mode]: current[mode] + 1,
-                    }))
-                  }
+                  onClick={() => onDurationChange(mode, 1)}
                   title={`Increase ${MODE_LABELS[mode]} duration`}
                 >
                   ＋

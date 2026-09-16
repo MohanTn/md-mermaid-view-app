@@ -1,6 +1,6 @@
 import React from 'react';
 import type { FileDocument, ParquetDocument, CodeGraphDocument } from '../../shared/types';
-import { PomodoroTimer } from '../pomodoro';
+import { PomodoroTimer, type PomodoroTimerProps } from '../pomodoro';
 import type { Theme } from '../hooks/use-theme';
 
 interface ToolbarProps {
@@ -11,6 +11,7 @@ interface ToolbarProps {
   onChooseFile: () => void;
   onThemeToggle: () => void;
   onOpenWorkspace: () => void;
+  pomodoro: PomodoroTimerProps;
 }
 
 export function Toolbar({
@@ -21,6 +22,7 @@ export function Toolbar({
   onChooseFile,
   onThemeToggle,
   onOpenWorkspace,
+  pomodoro,
 }: ToolbarProps): React.JSX.Element {
   return (
     <header className="toolbar">
@@ -50,7 +52,7 @@ export function Toolbar({
       >
         Code Graph
       </button>
-      <PomodoroTimer />
+      <PomodoroTimer {...pomodoro} />
       <button
         className="theme-toggle"
         onClick={onThemeToggle}

@@ -62,13 +62,13 @@ flowchart TD
     U2["Zoom/pan helpers (zoom-pan.ts) — clamp scale 0.25..8 and keep cursor point fixed — in: scale 1, point (100,50), factor 2 -> out: scale 2,x -100,y -50"]
     U3["Diagram comments — click SVG node, edit text, serialize sidecar — in: '[P4] (line 42): review' -> out: `<name>_review.txt` and highlighted node"]
     U4["History (history.ts) — de-duplicates and keeps newest 12 localStorage entries, groups by directory — in: repeated /repo/a.md -> out: one newest entry"]
-    U5["PomodoroTimer + pomodoro-logic — one-second tick while running, 25/5/15 minute defaults, long break every 4 work sessions — in: work 00:01 -> out: paused short/long break and Web Audio chime"]
+    U5["PomodoroTimer + pomodoro-logic — wall-clock deadline (state.endsAt) re-read every 500ms and on visibilitychange, 25/5/15 minute defaults, long break every 4 work sessions — in: hidden tab throttled to one callback/minute -> out: correct remaining time, then paused short/long break and Web Audio chime"]
     U1 ~~~ U2 ~~~ U3 ~~~ U4 ~~~ U5
     U1 -->|"1. button click or open-path event -> loadFile"| S4
     U2 -->|"2. wheel/pinch/button -> ViewTransform {scale,x,y}"| R3
     U3 -->|"3. parseSidecar/serializeSidecar through read/writeSidecar IPC"| O4
     U4 -->|"4. JSON localStorage key md-mermaid-viewer-history"| O5
-    U5 -->|"5. setInterval(...,1000), tick(state,durations)"| O3
+    U5 -->|"5. setInterval(...,500) + visibilitychange -> sync(state,Date.now()), tick(state,durations,now); completedSessions marks a clock that ran out"| O3
   end
 
   subgraph P6["6. Build and test path — source becomes packaged Electron output"]

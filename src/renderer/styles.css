@@ -248,6 +248,135 @@ button {
   color: var(--selected-text);
 }
 
+.todo-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 40%;
+  border-top: 1px solid var(--border);
+}
+.todo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-soft);
+}
+.todo-count {
+  color: var(--text-ghost);
+  font-size: 10px;
+  font-weight: 500;
+}
+.todo-add {
+  display: flex;
+  gap: 4px;
+  padding: 6px 6px 0;
+}
+.todo-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border-input);
+  border-radius: 3px;
+  background: var(--raised-bg);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+.todo-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.todo-add-button {
+  flex: 0 0 auto;
+  padding: 0 8px;
+  border: 1px solid var(--border-input);
+  border-radius: 3px;
+  background: var(--raised-bg);
+  color: inherit;
+  font-size: 12px;
+}
+.todo-add-button:hover {
+  background: var(--raised-hover);
+}
+.todo-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+.todo-item {
+  border-radius: 3px;
+  padding: 2px 4px;
+}
+.todo-item.active {
+  background: var(--selected-bg);
+}
+.todo-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.todo-check {
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.todo-title {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.todo-item.done .todo-title {
+  text-decoration: line-through;
+  color: var(--text-fainter);
+}
+.todo-running {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 10px;
+}
+.todo-start,
+.todo-delete {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--text-ghost);
+  font-size: 11px;
+  opacity: 0;
+}
+.todo-item:hover .todo-start,
+.todo-item:hover .todo-delete,
+.todo-item.active .todo-start {
+  opacity: 1;
+}
+.todo-start:hover,
+.todo-delete:hover {
+  color: var(--accent);
+}
+.todo-stats {
+  padding: 0 4px 3px 22px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.todo-hint {
+  margin: 8px 4px;
+  color: var(--text-fainter);
+  font-size: 11px;
+}
+
 .viewer {
   display: flex;
   flex-direction: column;
@@ -583,6 +712,15 @@ button {
   font-size: 9px;
   color: var(--text-faintest);
 }
+.pomodoro-task {
+  padding: 4px 2px 0;
+  color: var(--text-faint);
+  font-size: 11px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .pomodoro-actions {
   display: flex;
   gap: 6px;
@@ -872,6 +1010,18 @@ button {
 }
 .mermaid g.cluster {
   cursor: pointer;
+}
+/*
+ * Mermaid wraps HTML node/edge labels by fixing the label <div> to
+ * `wrappingWidth` and switching to `white-space: break-spaces`, which only
+ * breaks at spaces. A single long unbroken token (a path, identifier, or
+ * URL) still overflows that fixed-width box instead of wrapping, which
+ * looks like the text got cut off. Force those tokens to wrap too.
+ */
+.mermaid .nodeLabel,
+.mermaid .edgeLabel {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .mermaid svg {
   display: block;

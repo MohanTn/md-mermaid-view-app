@@ -1,6 +1,7 @@
 import React, { type PointerEvent as ReactPointerEvent } from 'react';
 import type { FileDocument, FileEntry, ParquetDocument, CodeGraphDocument } from '../../shared/types';
 import { directoryName, groupHistory, type HistoryEntry } from '../history';
+import { TodoPanel, type TodoPanelProps } from './todo-panel';
 
 const MIN_PANEL = 140;
 const MAX_PANEL = 480;
@@ -14,6 +15,7 @@ interface FileListProps {
   panelWidth: number;
   onLoadFile: (filePath: string) => void;
   onPanelWidthChange: (width: number) => void;
+  todos: TodoPanelProps;
 }
 
 export function FileList({
@@ -25,6 +27,7 @@ export function FileList({
   panelWidth,
   onLoadFile,
   onPanelWidthChange,
+  todos,
 }: FileListProps): React.JSX.Element | null {
   if (collapsed) return null;
 
@@ -49,6 +52,7 @@ export function FileList({
             <p className="file-list-empty">No .md, .mmd, or .parquet files here.</p>
           )}
         </div>
+        <TodoPanel {...todos} />
         <div className="history-section">
           <div className="history-header">Recent</div>
           <div className="history-body">

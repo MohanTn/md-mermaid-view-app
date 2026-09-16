@@ -16,6 +16,8 @@ import { useFileLoader } from "./hooks/use-file-loader";
 import { useMermaidRender } from "./hooks/use-mermaid-render";
 import { useDocumentEditor } from "./hooks/use-document-editor";
 import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
+import { usePomodoro } from "./hooks/use-pomodoro";
+import { useTodos } from "./hooks/use-todos";
 import "./styles.css";
 
 installBrowserViewer();
@@ -151,7 +153,23 @@ function App(): React.JSX.Element {
     isMermaidView: isMermaid,
   });
 
-  // 7. Keyboard shortcuts — depends on callbacks
+  // 7. Tasks + focus timer — the timer tags every session it finishes onto the
+  //    task the task panel says is active.
+  const todos = useTodos();
+  const pomodoro = usePomodoro(todos.recordSession);
+
+  // Starting the timer claims a task first, so the session has somewhere to go.
+  const startWork = (): void => {
+    todos.claimActiveTask();
+    pomodoro.startTimer();
+  };
+
+  const startTask = (id: string): void => {
+    todos.selectTask(id);
+    pomodoro.startTimer();
+  };
+
+  // 8. Keyboard shortcuts — depends on callbacks
   useKeyboardShortcuts({
     chooseFile,
     zoomAtCenter,
@@ -192,6 +210,17 @@ function App(): React.JSX.Element {
         panelWidth={panelWidth}
         onLoadFile={loadFile}
         onPanelWidthChange={handlePanelWidthChange}
+        todos={{
+          tasks: todos.tasks,
+          activeTaskId: todos.activeTaskId,
+          timerRunning: pomodoro.state.running,
+          timerMode: pomodoro.state.mode,
+          onCreate: todos.createTask,
+          onToggle: todos.toggleTask,
+          onDelete: todos.deleteTask,
+          onSelect: todos.selectTask,
+          onStartTask: startTask,
+        }}
       />
       <section className="viewer">
         <Toolbar
@@ -202,6 +231,16 @@ function App(): React.JSX.Element {
           onChooseFile={chooseFile}
           onThemeToggle={toggleTheme}
           onOpenWorkspace={openWorkspace}
+          pomodoro={{
+            state: pomodoro.state,
+            durations: pomodoro.durations,
+            activeTaskTitle: todos.activeTask?.title ?? null,
+            onStart: startWork,
+            onPause: pomodoro.pauseTimer,
+            onReset: pomodoro.resetTimer,
+            onModeChange: pomodoro.chooseMode,
+            onDurationChange: pomodoro.changeDuration,
+          }}
         />
         {error && <div className="error-banner">{error}</div>}
         <ContentArea
