@@ -18,6 +18,12 @@ export interface PomodoroState {
   secondsLeft: number;
   running: boolean;
   completedWork: number; // total completed work sessions
+  // Wall-clock deadline (epoch ms) while running, null while paused. The clock
+  // is the deadline, not the tick count: browsers throttle a hidden tab's
+  // timers to about one callback per minute, so counting ticks loses time.
+  // secondsLeft is a cache of the deadline, refreshed by sync().
+  endsAt: number | null;
+  completedSessions: number; // sessions of any mode that ran their clock out
 }
 
 export const MODE_LABELS: Record<PomodoroMode, string> = {
@@ -34,6 +40,8 @@ export function initialState(
     secondsLeft: durations.work * 60,
     running: false,
     completedWork: 0,
+    endsAt: null,
+    completedSessions: 0,
   };
 }
 
@@ -51,33 +59,78 @@ export function nextMode(
   return "work";
 }
 
-// Advance one second. When a session finishes, move to the next mode and stop
-// (the user starts the next session manually).
+// Refresh secondsLeft from the wall clock. Safe to call at any cadence: a tab
+// that was throttled for ten minutes lands on the right number in one call.
+export function sync(state: PomodoroState, now: number): PomodoroState {
+  if (!state.running || state.endsAt === null) return state;
+  const secondsLeft = Math.max(0, Math.ceil((state.endsAt - now) / 1000));
+  return secondsLeft === state.secondsLeft ? state : { ...state, secondsLeft };
+}
+
+// Re-read the clock. When the deadline has passed, move to the next mode and
+// stop (the user starts the next session manually).
 export function tick(
   state: PomodoroState,
   durations: PomodoroDurations,
+  now: number = Date.now(),
 ): PomodoroState {
   if (!state.running) return state;
-  if (state.secondsLeft > 1) {
-    return { ...state, secondsLeft: state.secondsLeft - 1 };
-  }
+  const current = sync(state, now);
+  if (current.secondsLeft > 0) return current;
   const completedWork =
-    state.mode === "work" ? state.completedWork + 1 : state.completedWork;
-  const mode = nextMode(state.mode, completedWork);
+    current.mode === "work" ? current.completedWork + 1 : current.completedWork;
+  const mode = nextMode(current.mode, completedWork);
   return {
     mode,
     secondsLeft: secondsFor(mode, durations),
     running: false,
     completedWork,
+    endsAt: null,
+    completedSessions: current.completedSessions + 1,
   };
 }
 
-export function start(state: PomodoroState): PomodoroState {
-  return { ...state, running: true };
+export interface EndedSession {
+  mode: PomodoroMode;
+  seconds: number;
+  completed: boolean;
 }
 
-export function pause(state: PomodoroState): PomodoroState {
-  return { ...state, running: false };
+// Compare the state before and after one transition (a tick, a pause, a reset or
+// a manual mode switch) and report the session that just ended, or null when
+// nothing ended. Only tick() bumps completedSessions, so that counter is what
+// separates a clock that ran out from a pause or a manual switch, which are
+// partial sessions worth the seconds already spent. Pass a previous state that
+// is in sync with the clock, otherwise a throttled tab reports too few seconds.
+export function endedSession(
+  previous: PomodoroState,
+  next: PomodoroState,
+  durations: PomodoroDurations,
+): EndedSession | null {
+  if (!previous.running) return null;
+  const full = secondsFor(previous.mode, durations);
+  if (next.completedSessions > previous.completedSessions) {
+    return { mode: previous.mode, seconds: full, completed: true };
+  }
+  if (next.running) return null;
+  const elapsed = full - previous.secondsLeft;
+  return elapsed > 0
+    ? { mode: previous.mode, seconds: elapsed, completed: false }
+    : null;
+}
+
+export function start(
+  state: PomodoroState,
+  now: number = Date.now(),
+): PomodoroState {
+  return { ...state, running: true, endsAt: now + state.secondsLeft * 1000 };
+}
+
+export function pause(
+  state: PomodoroState,
+  now: number = Date.now(),
+): PomodoroState {
+  return { ...sync(state, now), running: false, endsAt: null };
 }
 
 export function reset(
@@ -88,6 +141,7 @@ export function reset(
     ...state,
     secondsLeft: secondsFor(state.mode, durations),
     running: false,
+    endsAt: null,
   };
 }
 
@@ -101,6 +155,7 @@ export function setMode(
     mode,
     secondsLeft: secondsFor(mode, durations),
     running: false,
+    endsAt: null,
   };
 }
 
